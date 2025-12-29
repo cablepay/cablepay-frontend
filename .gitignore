@@ -1,0 +1,103 @@
+# =========================
+# Dart / Flutter
+# =========================
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-version
+build/
+
+# Generated files
+**/generated_plugin_registrant.dart
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+firebase_options.dart
+
+# =========================
+# Firebase (DO NOT COMMIT)
+# =========================
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+macos/Runner/GoogleService-Info.plist
+web/firebase-config.js
+
+# =========================
+# Android
+# =========================
+android/.gradle/
+android/.idea/
+android/local.properties
+android/key.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+*.jks
+*.keystore
+
+# =========================
+# iOS / macOS
+# =========================
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/.last_build_id
+ios/Runner.xcworkspace/
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Runner/Assets.xcassets/AppIcon.appiconset/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+
+macos/Pods/
+macos/Flutter/ephemeral/
+
+# =========================
+# Web
+# =========================
+web/.dart_tool/
+web/build/
+
+# =========================
+# IDE / Editor
+# =========================
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# =========================
+# Logs / Temp
+# =========================
+*.log
+*.tmp
+*.swp
+*.class
+.DS_Store
+Thumbs.db
+
+# =========================
+# Coverage / Testing
+# =========================
+coverage/
+test/.test_results/
+
+# =========================
+# Obfuscation / Symbols
+# =========================
+app.*.symbols
+app.*.map.json
+
+# =========================
+# Misc
+# =========================
+.history/
+.svn/
+.swiftpm/
+.migrate_working_dir/
