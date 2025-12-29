@@ -28,7 +28,7 @@ Future<void> main() async {
   if (!kIsWeb) {
     await Firebase.initializeApp();
 
-    // 🔴 REQUIRED FOR KILLED / BACKGROUND STATE
+    //  REQUIRED FOR KILLED / BACKGROUND STATE
     FirebaseMessaging.onBackgroundMessage(
       firebaseMessagingBackgroundHandler,
     );
