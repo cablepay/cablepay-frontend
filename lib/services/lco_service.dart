@@ -37,6 +37,26 @@ class LcoService {
     return {'statusCode': status, 'data': res['body']};
   }
 
+  /// Fetch decrypted credentials for a specific network.
+  /// This endpoint is protected and only accessible by the owning LCO.
+  ///
+  /// GET /api/lcos/:lcoId/networks/:networkId/credentials
+  static Future<Map<String, dynamic>> getNetworkCredentials(
+      String lcoId,
+      String networkId,
+      ) async {
+    final encoded = Uri.encodeComponent(networkId);
+    final res = await ApiConfig.get(
+      '/api/lcos/$lcoId/networks/$encoded/credentials',
+    );
+
+    return {
+      'statusCode': res['statusCode'],
+      'data': res['body'],
+    };
+  }
+
+
   // Create or update lco details (profile)
   static Future<Map<String, dynamic>> upsertLco(String lcoId, {required Map<String, dynamic> body}) async {
     if (lcoId == 'new') {

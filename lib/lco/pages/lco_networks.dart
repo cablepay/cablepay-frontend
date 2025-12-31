@@ -35,24 +35,19 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
         return value.toString();
       }
 
-      final bool hasUsername = m['userName'] == true;
-      final bool hasPassword = m['password'] == true;
 
       return _NetworkRow(
         isExisting: true,
         networkNameCtrl: TextEditingController(text: m['networkName'] ?? ''),
         lcoIdCtrl: TextEditingController(text: m['lcoId'] ?? ''),
-        userNameCtrl: TextEditingController(
-          text: hasUsername ? '********' : '',
-        ),
-        passwordCtrl: TextEditingController(
-          text: hasPassword ? '********' : '',
-        ),
+        userNameCtrl: TextEditingController(), // start empty
+        passwordCtrl: TextEditingController(), // start empty
         websiteCtrl: TextEditingController(text: m['website'] ?? ''),
         fixedPriceCtrl: TextEditingController(
           text: m['fixedPrice']?.toString() ?? '',
         ),
       );
+
 
     }).toList();
 
@@ -119,17 +114,20 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
         fixedPrice = double.tryParse(fixedPriceText);
       }
 
-      // Logic: If user didn't change the '********' placeholder, 
-      // we might want to send the original or the backend handles non-change.
-      // For this production code, we assume any change replaces the value.
+
       networks.add({
         'networkName': name,
         'lcoId': lcoId,
-        'userName': userName == '********' ? null : userName, // null means "don't update" if backend supports it
         'website': website.isNotEmpty ? website : null,
-        'password': password == '********' ? null : password,
         'fixedPrice': fixedPrice,
+
+        // 🔐 IMPORTANT RULE (MATCHES BACKEND)
+        // empty  -> null  -> backend keeps old
+        // typed  -> value -> backend encrypts & rotates
+        'userName': userName.isEmpty ? null : userName,
+        'password': password.isEmpty ? null : password,
       });
+
     }
 
     if (networks.isEmpty) {
@@ -307,26 +305,55 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                               // --- USER NAME FIELD ---
                               TextFormField(
                                 controller: r.userNameCtrl,
-                                obscureText: !r.isUserNameVisible, // Toggle based on state
+                                obscureText: !r.isUserNameVisible,
                                 decoration: _input(
                                   'User Name *',
                                   icon: Icons.person,
-                                  // Add eye icon to toggle visibility
                                   suffixIcon: IconButton(
                                     icon: Icon(
                                       r.isUserNameVisible ? Icons.visibility : Icons.visibility_off,
                                       size: 20,
                                       color: AppTheme.muted,
                                     ),
-                                    onPressed: () => setState(() => r.isUserNameVisible = !r.isUserNameVisible),
+                                    onPressed: () async {
+                                      if (!r.isExisting) {
+                                        setState(() => r.isUserNameVisible = !r.isUserNameVisible);
+                                        return;
+                                      }
+
+                                      final lcoId = widget.lco['_id']?.toString();
+                                      if (lcoId == null) return;
+
+                                      final res = await LcoService.getNetworkCredentials(
+                                        lcoId,
+                                        r.lcoIdCtrl.text,
+                                      );
+
+                                      if (!mounted) return;
+
+                                      if (res['statusCode'] == 200) {
+                                        r.userNameCtrl.text = res['data']['userName'] ?? '';
+                                        r.passwordCtrl.text = res['data']['password'] ?? '';
+
+                                        setState(() {
+                                          r.isUserNameVisible = true;
+                                          r.isPasswordVisible = true;
+                                        });
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Unable to load credentials')),
+                                        );
+                                      }
+                                    },
                                   ),
                                 ),
                                 validator: (v) {
-                                  if (r.isExisting && v == '********') return null;
+                                  if (r.isExisting && (v == null || v.isEmpty)) return null;
                                   if (v == null || v.trim().isEmpty) return 'Required';
                                   return null;
                                 },
                               ),
+
 
                               const SizedBox(height: 8),
 
@@ -348,10 +375,11 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                                   ),
                                 ),
                                 validator: (v) {
-                                  if (r.isExisting && v == '********') return null;
+                                  if (r.isExisting && (v == null || v.isEmpty)) return null;
                                   if (v == null || v.trim().isEmpty) return 'Required';
                                   return null;
                                 },
+
                               ),
                             ],
                           ),

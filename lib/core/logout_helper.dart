@@ -2,26 +2,32 @@ import 'package:flutter/material.dart';
 import '../core/api_config.dart';
 import '../core/local_storage.dart';
 import '../routes.dart';
+bool _isLoggingOut = false;
 
 Future<void> performLogout(BuildContext context) async {
-  try {
-    // 🔴 IMPORTANT: tell backend to deactivate devices
-    await ApiConfig.post('/api/auth/logout', {});
-  } catch (_) {
-    // ignore network / token errors — logout must continue
-  }
+  if (_isLoggingOut) return;
+  _isLoggingOut = true;
 
-  // Clear all local persistence
+  try {
+    // Backend logout (best effort)
+    await ApiConfig.post('/api/auth/logout', {});
+  } catch (_) {}
+
+  // Clear local state
   await LocalStorage.clearSession();
   await LocalStorage.clearCustomer();
   await LocalStorage.clearLco();
 
-  // Clear in-memory auth
   ApiConfig.setSessionKey(null);
 
-  // Hard reset navigation stack
-  Navigator.of(context).pushNamedAndRemoveUntil(
-    AppRoutes.customerLogin,
-        (route) => false,
-  );
+  // 🔴 ALWAYS navigate using root navigator
+  if (context.mounted) {
+    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+      AppRoutes.customerLogin,
+          (_) => false,
+    );
+  }
+
+  _isLoggingOut = false;
 }
+

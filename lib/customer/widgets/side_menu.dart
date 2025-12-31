@@ -16,7 +16,8 @@ class SideMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = (customer?['name'] ?? customer?['fullName'] ?? 'Customer').toString();
+    final name = (customer?['name'] ?? customer?['fullName'] ?? 'Customer')
+        .toString();
     final phone = (customer?['phone'] ?? customer?['mobile'] ?? '').toString();
 
     // Responsive width:
@@ -58,9 +59,10 @@ class SideMenu extends StatelessWidget {
                       child: Text(
                         (name.isNotEmpty ? name[0].toUpperCase() : '?'),
                         style: const TextStyle(
-                            color: AppTheme.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20),
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -68,22 +70,30 @@ class SideMenu extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(name,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16)),
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             phone.isEmpty ? 'No phone' : phone,
                             style: TextStyle(
-                                color: Colors.white.withOpacity(0.9), fontSize: 13),
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 13,
+                            ),
                           ),
                           const SizedBox(height: 6),
-                          Text('Member since ${_memberSinceText(customer)}',
-                              style: TextStyle(
-                                  color: Colors.white.withOpacity(0.85),
-                                  fontSize: 12)),
+                          Text(
+                            'Member since ${_memberSinceText(customer)}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.85),
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -107,7 +117,9 @@ class SideMenu extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => AppBottomNavigation(
-                              customer: customer ?? {}, initialIndex: 0),
+                            customer: customer ?? {},
+                            initialIndex: 0,
+                          ),
                         ),
                       );
                     },
@@ -122,7 +134,9 @@ class SideMenu extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => AppBottomNavigation(
-                              customer: customer ?? {}, initialIndex: 4),
+                            customer: customer ?? {},
+                            initialIndex: 4,
+                          ),
                         ),
                       );
                     },
@@ -137,7 +151,9 @@ class SideMenu extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => AppBottomNavigation(
-                              customer: customer ?? {}, initialIndex: 3),
+                            customer: customer ?? {},
+                            initialIndex: 3,
+                          ),
                         ),
                       );
                     },
@@ -152,7 +168,9 @@ class SideMenu extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => AppBottomNavigation(
-                              customer: customer ?? {}, initialIndex: 2),
+                            customer: customer ?? {},
+                            initialIndex: 2,
+                          ),
                         ),
                       );
                     },
@@ -167,7 +185,9 @@ class SideMenu extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => AppBottomNavigation(
-                              customer: customer ?? {}, initialIndex: 1),
+                            customer: customer ?? {},
+                            initialIndex: 1,
+                          ),
                         ),
                       );
                     },
@@ -179,13 +199,18 @@ class SideMenu extends StatelessWidget {
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  WalletPage(customer: customer ?? {})));
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WalletPage(customer: customer ?? {}),
+                        ),
+                      );
                     },
                   ),
-                  Divider(height: 24, thickness: 1, color: Colors.grey.shade200),
+                  Divider(
+                    height: 24,
+                    thickness: 1,
+                    color: Colors.grey.shade200,
+                  ),
                   _buildTile(
                     context,
                     icon: Icons.person,
@@ -193,10 +218,11 @@ class SideMenu extends StatelessWidget {
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  ProfilePage(customer: customer ?? {})));
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfilePage(customer: customer ?? {}),
+                        ),
+                      );
                     },
                   ),
                 ],
@@ -209,15 +235,13 @@ class SideMenu extends StatelessWidget {
             Container(
               decoration: BoxDecoration(
                 color: Colors.white, // Opaque background
-                border: Border(
-                  top: BorderSide(color: AppTheme.divider),
-                ),
+                border: Border(top: BorderSide(color: AppTheme.divider)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.05),
                     offset: const Offset(0, -2),
                     blurRadius: 4,
-                  )
+                  ),
                 ],
               ),
               child: SafeArea(
@@ -225,27 +249,50 @@ class SideMenu extends StatelessWidget {
                 // Add extra bottom padding here to clear the floating button
                 minimum: const EdgeInsets.only(bottom: 24),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
                         child: TextButton.icon(
                           onPressed: () async {
-                            Navigator.pop(context);
-                            await performLogout(context);
+                            // 1️⃣ Close drawer
+                            Navigator.of(context).pop();
+
+                            // 2️⃣ Defer logout to next frame with ROOT context
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              final rootContext = Navigator.of(
+                                context,
+                                rootNavigator: true,
+                              ).context;
+                              performLogout(rootContext);
+                            });
                           },
-                          icon: const Icon(Icons.logout, color: Colors.redAccent),
-                          label: const Text('Logout',
-                              style: TextStyle(
-                                  color: Colors.redAccent,
-                                  fontWeight: FontWeight.w600)),
+
+                          icon: const Icon(
+                            Icons.logout,
+                            color: Colors.redAccent,
+                          ),
+                          label: const Text(
+                            'Logout',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           style: TextButton.styleFrom(
                             foregroundColor: Colors.redAccent,
                             padding: const EdgeInsets.symmetric(
-                                vertical: 14, horizontal: 12),
-                            alignment: Alignment.centerLeft, // Align left clearly
+                              vertical: 14,
+                              horizontal: 12,
+                            ),
+                            alignment:
+                                Alignment.centerLeft, // Align left clearly
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             backgroundColor: Colors.redAccent.withOpacity(0.04),
                           ),
                         ),
@@ -263,7 +310,8 @@ class SideMenu extends StatelessWidget {
 
   String _memberSinceText(Map<String, dynamic>? customer) {
     try {
-      final createdAt = customer?['createdAt'] ??
+      final createdAt =
+          customer?['createdAt'] ??
           customer?['created_at'] ??
           customer?['createdAtUtc'];
       if (createdAt == null) return '—';
@@ -275,10 +323,12 @@ class SideMenu extends StatelessWidget {
     }
   }
 
-  Widget _buildTile(BuildContext context,
-      {required IconData icon,
-        required String label,
-        required VoidCallback onTap}) {
+  Widget _buildTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return ListTile(
       leading: Icon(icon, color: AppTheme.primary),
       title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -290,8 +340,11 @@ class SideMenu extends StatelessWidget {
       hoverColor: AppTheme.surfaceVariant,
       dense: true,
       visualDensity: VisualDensity.compact,
-      trailing:
-      const Icon(Icons.chevron_right, size: 20, color: Colors.black45),
+      trailing: const Icon(
+        Icons.chevron_right,
+        size: 20,
+        color: Colors.black45,
+      ),
     );
   }
 }

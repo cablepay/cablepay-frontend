@@ -75,7 +75,9 @@ class _StartupRouterState extends State<StartupRouter> {
     _init();
 
     if (!kIsWeb) {
-      FirebaseMessaging.onMessage.listen((message) {
+      FirebaseMessaging.onMessage.listen((message) async {
+        final session = await LocalStorage.getSession();
+        if (session == null) return;
         if (!mounted) return;
 
         final data = message.data;

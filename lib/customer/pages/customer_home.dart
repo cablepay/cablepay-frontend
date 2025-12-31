@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../../core/api_config.dart';
 import '../../core/local_storage.dart';
 import '../../core/app_theme.dart';
+import '../../core/logout_helper.dart';
 import '../../routes.dart';
 import '../../services/customer_service.dart';
 import '../widgets/bottom_navigation.dart';
@@ -53,6 +54,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   final Map<String, bool> _useWalletForBox = {}; // boxId -> useWallet toggle
 
+  bool get _hasSession => ApiConfig.sessionKey != null;
+
   // modify initState to fetch wallet for the card (keep existing calls)
   @override
   void initState() {
@@ -61,12 +64,21 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Future<void> _init() async {
+    if (!_hasSession) {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+      return;
+    }
+
     await _loadBoxes();
     await _loadWalletForCard();
   }
 
 
+
   Future<void> _loadBoxes() async {
+    if (!_hasSession) return;
     if (!mounted) return;
     await safeSetState(this, () {
       loading = true;
@@ -190,6 +202,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Future<void> _confirmAndPay(Map<String, dynamic> box) async {
+    if (!_hasSession) return;
     final customerId = widget.customer['_id'] ?? widget.customer['id'];
     final boxId = (box['_id'] ?? box['id']);
     if (customerId == null || boxId == null) {
@@ -416,21 +429,21 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  void _logout() async {
-    try {
-      try {
-        await ApiConfig.post('/api/auth/logout', {});
-      } catch (e, st) {
-        debugPrint('CustomerHome error: $e');
-      }
-      await LocalStorage.clearSession();
-      await LocalStorage.clearCustomer();
-      ApiConfig.setSessionKey(null);
-      Navigator.pushReplacementNamed(context, AppRoutes.customerLogin);
-    } catch (e) {
-      Navigator.pushReplacementNamed(context, AppRoutes.customerLogin);
-    }
-  }
+  // void _logout() async {
+  //   try {
+  //     try {
+  //       await ApiConfig.post('/api/auth/logout', {});
+  //     } catch (e, st) {
+  //       debugPrint('CustomerHome error: $e');
+  //     }
+  //     await LocalStorage.clearSession();
+  //     await LocalStorage.clearCustomer();
+  //     ApiConfig.setSessionKey(null);
+  //     Navigator.pushReplacementNamed(context, AppRoutes.customerLogin);
+  //   } catch (e) {
+  //     Navigator.pushReplacementNamed(context, AppRoutes.customerLogin);
+  //   }
+  // }
 
   String _lcoDisplay(Map<String, dynamic> box) {
     final lcoRef = box['lcoRef'];
@@ -982,6 +995,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   // new helper to load wallet for the card
   Future<void> _loadWalletForCard() async {
+    if (!_hasSession) return;
     final customerId =
         widget.customer['_id'] ??
         widget.customer['id'] ??
@@ -1357,7 +1371,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
     return Scaffold(
       backgroundColor: AppTheme.grey1,
-      drawer: SideMenu(customer: widget.customer, onLogout: _logout),
+      drawer: SideMenu(
+        customer: widget.customer,
+        onLogout: () => performLogout(context),
+      ),
       appBar: AppBar(
         elevation: 1,
         backgroundColor: Colors.white,
