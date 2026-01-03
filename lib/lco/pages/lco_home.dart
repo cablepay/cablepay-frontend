@@ -43,6 +43,18 @@ class _LcoHomePageState extends State<LcoHomePage> {
     _loadAll();
   }
 
+  String? _resolvePeriodForApi() {
+    if (_overviewMonth == null) return null;
+
+    final now = DateTime.now();
+    final isCurrentMonth =
+        _overviewMonth!.year == now.year &&
+            _overviewMonth!.month == now.month;
+
+    return isCurrentMonth ? null : _overviewPeriodKey;
+  }
+
+
   Future<void> _loadAll() async {
     setState(() {
       loading = true;
@@ -52,12 +64,11 @@ class _LcoHomePageState extends State<LcoHomePage> {
 
     // If user has picked a month, always use that period.
     // Otherwise let backend use current month by passing null.
-    final String? period =
-    _overviewMonth != null ? _overviewPeriodKey : null;
+    final String? period = _resolvePeriodForApi();
 
     await Future.wait([
       _loadLco(),
-      _loadStats(),
+      _loadStats(period: period),
       _loadFinancials(period: period),
     ]);
 
@@ -101,7 +112,7 @@ class _LcoHomePageState extends State<LcoHomePage> {
     }
   }
 
-  Future<void> _loadStats() async {
+  Future<void> _loadStats({String? period}) async {
     setState(() => statsLoading = true);
     final lcoId = widget.lco['_id'] ?? widget.lco['id'];
     if (lcoId == null) {
@@ -113,7 +124,10 @@ class _LcoHomePageState extends State<LcoHomePage> {
     }
 
     try {
-      final res = await LcoService.getLcoStats(lcoId.toString());
+      final res = await LcoService.getLcoStats(
+        lcoId.toString(),
+        period: period,
+      );
       if (!mounted) return;
       if (res['statusCode'] == 200 && res['data'] != null) {
         setState(() {
@@ -181,7 +195,8 @@ class _LcoHomePageState extends State<LcoHomePage> {
       context: context,
       firstDate: firstDate,
       lastDate: lastDate,
-      initialDate: initialDate,
+      initialDate: DateTime(initialDate.year, initialDate.month, 1),
+
       builder: (context, child) {
         final theme = Theme.of(context);
         return Theme(
@@ -200,15 +215,13 @@ class _LcoHomePageState extends State<LcoHomePage> {
     if (picked != null) {
       // normalize: only year+month
       final normalized = DateTime(picked.year, picked.month, 1);
-      final period =
-          '${normalized.year}-${normalized.month.toString().padLeft(2, '0')}';
 
       setState(() {
         _overviewMonth = normalized;
       });
 
-      // reload financials for this period (backend already supports ?period=YYYY-MM)
-      await _loadFinancials(period: period);
+      // 🔥 SINGLE source of truth for period
+      await _loadAll();
     }
   }
 
@@ -356,17 +369,29 @@ class _LcoHomePageState extends State<LcoHomePage> {
       context,
       MaterialPageRoute(builder: (_) => LcoNetworksPage(lco: current)),
     );
+
+    final period = _resolvePeriodForApi();
+
     if (updated != null) {
       setState(() {
         lcoDetails = updated;
         _initSelectionFromDetails();
       });
       await LocalStorage.saveLco(updated);
-      await Future.wait([_loadStats(), _loadFinancials()]);
+
+      await Future.wait([
+        _loadStats(period: period),
+        _loadFinancials(period: period),
+      ]);
     } else {
-      await _loadAll();
+      // Even if nothing changed, reload WITH PERIOD
+      await Future.wait([
+        _loadStats(period: period),
+        _loadFinancials(period: period),
+      ]);
     }
   }
+
 
   void _showSelectedNetworksDialog() {
     final networks = _getNetworks();
@@ -432,7 +457,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
     return int.tryParse(v.toString()) ?? 0;
   }
 
-
   Widget _buildHeaderCard(double maxWidth) {
     // ---------- 1. Base overall data (amounts, fallback counts) ----------
     final overallDyn = financials?['overall'];
@@ -441,10 +465,9 @@ class _LcoHomePageState extends State<LcoHomePage> {
         : <String, dynamic>{};
 
     // amounts always come from overall for now
-    final num totalAmt    = _num(overall['totalAmountRupees']);
-    final num paidAmt     = _num(overall['paidAmountRupees']);
-    final num notPaidAmt  = _num(overall['notPaidAmountRupees']);
-
+    final num totalAmt = _num(overall['totalAmountRupees']);
+    final num paidAmt = _num(overall['paidAmountRupees']);
+    final num notPaidAmt = _num(overall['notPaidAmountRupees']);
 
     // ---------- 2. Per-period customer summary ----------
     final periodKey = _overviewPeriodKey;
@@ -505,14 +528,31 @@ class _LcoHomePageState extends State<LcoHomePage> {
     //         .toString()) ??
     //     (totalCust - paidCust);
 
-
-
     // ---------- 3. Overall stats (new / referred) ----------
+
+
+    // NEW / REFERRED must be period-aware
+    int newCust = 0;
+    int referredCust = 0;
+
+    final periodStatsArr = stats?['networks'];
+    if (periodStatsArr is List) {
+      for (final e in periodStatsArr) {
+        if (e is Map) {
+          newCust += _int(e['newCustomers']);
+          referredCust += _int(e['referredCustomers']);
+        }
+      }
+    }
+
+
+
     final overallStatsDyn = stats?['overall'];
     final Map<String, dynamic> overallStats = (overallStatsDyn is Map)
         ? Map<String, dynamic>.from(overallStatsDyn as Map)
         : <String, dynamic>{};
 
+    // Always normalize numbers BEFORE math
     final int totalCust = _int(
       periodSummary['totalCustomers'] ?? overall['totalCustomers'],
     );
@@ -523,13 +563,12 @@ class _LcoHomePageState extends State<LcoHomePage> {
 
     final int notPaidCust = _int(
       periodSummary['notPaidCustomers'] ??
-          overall['notPaidCustomers'] ??
-          (totalCust - paidCust),
+          (totalCust - paidCust >= 0 ? totalCust - paidCust : 0),
     );
 
-    final int newCust = _int(overallStats['newCustomers']);
-    final int referredCust = _int(overallStats['referredCustomers']);
 
+    // final int newCust = _int(overallStats['newCustomers']);
+    // final int referredCust = _int(overallStats['referredCustomers']);
 
     // final int newCust = (overallStats['newCustomers'] ?? 0) is num
     //     ? (overallStats['newCustomers'] ?? 0) as int
@@ -559,73 +598,73 @@ class _LcoHomePageState extends State<LcoHomePage> {
           ),
           child: isVeryCompact
               ? Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(height: 4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.text,
-                  ),
-                ),
-              ),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.muted,
-                  ),
-                ),
-              ),
-            ],
-          )
-              : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: 16, color: color),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: FittedBox(
-                      alignment: Alignment.centerLeft,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 18, color: color),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                    FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
                         label,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: AppTheme.muted,
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              FittedBox(
-                alignment: Alignment.centerLeft,
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.text,
-                  ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(icon, size: 16, color: color),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: FittedBox(
+                            alignment: Alignment.centerLeft,
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              label,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.muted,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    FittedBox(
+                      alignment: Alignment.centerLeft,
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        value,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.text,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       );
     }
@@ -665,42 +704,42 @@ class _LcoHomePageState extends State<LcoHomePage> {
                       ],
                     ),
                   ),
-                  // const SizedBox(width: 8),
-                  // InkWell(
-                  //   onTap: _pickOverviewMonth,
-                  //   borderRadius: BorderRadius.circular(20),
-                  //   child: Container(
-                  //     padding: const EdgeInsets.symmetric(
-                  //       horizontal: 10,
-                  //       vertical: 4,
-                  //     ),
-                  //     decoration: BoxDecoration(
-                  //       color: AppTheme.surfaceVariant,
-                  //       borderRadius: BorderRadius.circular(20),
-                  //       border: Border.all(
-                  //         color: AppTheme.divider.withOpacity(0.9),
-                  //       ),
-                  //     ),
-                  //     child: Row(
-                  //       mainAxisSize: MainAxisSize.min,
-                  //       children: [
-                  //         const Icon(
-                  //           Icons.date_range,
-                  //           size: 14,
-                  //           color: AppTheme.muted,
-                  //         ),
-                  //         const SizedBox(width: 4),
-                  //         Text(
-                  //           _overviewMonthLabel,
-                  //           style: const TextStyle(
-                  //             fontSize: 11,
-                  //             color: AppTheme.muted,
-                  //           ),
-                  //         ),
-                  //       ],
-                  //     ),
-                  //   ),
-                  // ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: _pickOverviewMonth,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppTheme.divider.withOpacity(0.9),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.date_range,
+                            size: 14,
+                            color: AppTheme.muted,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _overviewMonthLabel,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
 
@@ -776,10 +815,7 @@ class _LcoHomePageState extends State<LcoHomePage> {
                       children: [
                         const Text(
                           'Total Customer Payable',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.muted,
-                          ),
+                          style: TextStyle(fontSize: 11, color: AppTheme.muted),
                         ),
                         const SizedBox(height: 2),
                         FittedBox(
@@ -821,7 +857,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
       ),
     );
   }
-
 
   // Helper for the bottom right amounts to prevent repetition
   Widget _buildMiniAmountRow(String label, num amount, Color color) {
@@ -970,8 +1005,7 @@ class _LcoHomePageState extends State<LcoHomePage> {
 
     final fin = finMap[nid] ?? {};
     final totalAmt = _num(fin['totalAmountRupees']);
-    final paidAmt  = _num(fin['paidAmountRupees']);
-
+    final paidAmt = _num(fin['paidAmountRupees']);
 
     final bool isCompact = maxWidth < 380;
     final name = (n['networkName'] ?? '-').toString();
@@ -1005,11 +1039,16 @@ class _LcoHomePageState extends State<LcoHomePage> {
             builder: (_) => NetworkDetailPage(
               lcoId: lcoRefId.toString(),
               network: Map<String, dynamic>.from(n),
+              period: _resolvePeriodForApi(),
             ),
           ),
         );
         if (result == true) {
-          await Future.wait([_loadStats(), _loadFinancials()]);
+          final period = _resolvePeriodForApi();
+          await Future.wait([
+            _loadStats(period: period),
+            _loadFinancials(period: period),
+          ]);
         }
       },
       child: DecoratedCard(
@@ -1428,30 +1467,32 @@ class _LcoHomePageState extends State<LcoHomePage> {
     final periods = fin['periods'];
     if (periods is! Map) return {};
 
-    // 1️⃣ First try exact key
+    // ALWAYS try selected month first
     if (_overviewPeriodKey.isNotEmpty && periods[_overviewPeriodKey] is Map) {
       return Map<String, dynamic>.from(periods[_overviewPeriodKey]);
     }
 
-    // 2️⃣ Fallback: use latest available period from backend
-    final keys = periods.keys
-        .map((e) => e.toString())
-        .where((e) => RegExp(r'^\d{4}-\d{2}$').hasMatch(e))
-        .toList()
-      ..sort();
+    // If user explicitly selected a month → DO NOT fallback
+    if (_overviewMonth != null) {
+      return {};
+    }
+
+    // Otherwise fallback to latest available period
+    final keys =
+        periods.keys
+            .map((e) => e.toString())
+            .where((e) => RegExp(r'^\d{4}-\d{2}$').hasMatch(e))
+            .toList()
+          ..sort();
 
     if (keys.isNotEmpty) {
       final latest = keys.last;
       final p = periods[latest];
-      if (p is Map) {
-        return Map<String, dynamic>.from(p);
-      }
+      if (p is Map) return Map<String, dynamic>.from(p);
     }
 
     return {};
   }
-
-
 
   Map<String, double> _calculateSettlementNumbers() {
     final periodFin = _currentPeriodFinancials();
@@ -1503,8 +1544,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
       'remaining': remaining,
     };
   }
-
-
 
   Widget _buildNetworkFeeCard(double maxWidth) {
     final networks = _getNetworks();
@@ -1597,12 +1636,19 @@ class _LcoHomePageState extends State<LcoHomePage> {
                           spacing: 8,
                           runSpacing: 8,
                           children: displayNetworks.map((n) {
-                            final name = (n['networkName'] ?? n['name'] ?? 'Network').toString();
+                            final name =
+                                (n['networkName'] ?? n['name'] ?? 'Network')
+                                    .toString();
                             return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade50,
-                                borderRadius: BorderRadius.circular(30), // Pill shape
+                                borderRadius: BorderRadius.circular(
+                                  30,
+                                ), // Pill shape
                                 border: Border.all(
                                   color: Colors.grey.shade300,
                                   width: 0.8,
@@ -1637,10 +1683,7 @@ class _LcoHomePageState extends State<LcoHomePage> {
                 const SizedBox(width: 16),
 
                 // Vertical Divider
-                Container(
-                  width: 1,
-                  color: Colors.grey.withOpacity(0.1),
-                ),
+                Container(width: 1, color: Colors.grey.withOpacity(0.1)),
                 const SizedBox(width: 16),
 
                 // ───────── RIGHT COLUMN: Professional Amount Display ─────────
@@ -1651,7 +1694,11 @@ class _LcoHomePageState extends State<LcoHomePage> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.receipt_long_rounded, size: 14, color: AppTheme.primary),
+                        const Icon(
+                          Icons.receipt_long_rounded,
+                          size: 14,
+                          color: AppTheme.primary,
+                        ),
                         const SizedBox(width: 4),
                         const Text(
                           'Network fee',
@@ -1692,29 +1739,25 @@ class _LcoHomePageState extends State<LcoHomePage> {
     );
   }
 
-
-
   Widget _buildSettlementCard(double maxWidth) {
-
     final data = _calculateSettlementNumbers();
-    final totalReceived      = data['totalReceived']      ?? 0.0;
+    final totalReceived = data['totalReceived'] ?? 0.0;
     final platformCommission = data['platformCommission'] ?? 0.0;
-    final referralPayout     = data['referralPayout']     ?? 0.0;
-    final networkFee         = data['networkFee']         ?? 0.0;
-    final settlement         = data['settlement']         ?? 0.0;
+    final referralPayout = data['referralPayout'] ?? 0.0;
+    final networkFee = data['networkFee'] ?? 0.0;
+    final settlement = data['settlement'] ?? 0.0;
 
-    final paidSoFar  = data['paidSoFar']  ?? 0.0;
-    final remaining  = data['remaining']  ?? 0.0;
-
+    final paidSoFar = data['paidSoFar'] ?? 0.0;
+    final remaining = data['remaining'] ?? 0.0;
 
     final bool isCompact = maxWidth < 380;
 
     Widget rowLabelValue(
-        String label,
-        String value, {
-          Color? valueColor,
-          bool emphasize = false,
-        }) {
+      String label,
+      String value, {
+      Color? valueColor,
+      bool emphasize = false,
+    }) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3.0),
         child: Row(
@@ -1801,14 +1844,14 @@ class _LcoHomePageState extends State<LcoHomePage> {
                         color: AppTheme.divider.withOpacity(0.9),
                       ),
                     ),
-                    child: const Text(
-                      'Platform: 10%',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.muted,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    // child: const Text(
+                    //   'Platform: 10%',
+                    //   style: TextStyle(
+                    //     fontSize: 11,
+                    //     color: AppTheme.muted,
+                    //     fontWeight: FontWeight.w500,
+                    //   ),
+                    // ),
                   ),
                 ],
               ),
@@ -1822,7 +1865,7 @@ class _LcoHomePageState extends State<LcoHomePage> {
               ),
               const SizedBox(height: 4),
               rowLabelValue(
-                'Platform service fees (10%)',
+                'Platform service fees ',
                 '₹${currencyFormat.format(platformCommission)}',
                 valueColor: Colors.orange.shade700,
               ),
@@ -1867,7 +1910,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
               const SizedBox(height: 8),
 
               // const SizedBox(height: 6),
-
               rowLabelValue(
                 'Paid so far',
                 '₹${currencyFormat.format(paidSoFar)}',
@@ -1881,7 +1923,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
                 '₹${currencyFormat.format(remaining)}',
                 valueColor: remaining > 0 ? Colors.redAccent : Colors.green,
               ),
-
             ],
           ),
         ),
@@ -1891,7 +1932,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
 
   @override
   Widget build(BuildContext context) {
-
     final titleName = (widget.lco['businessName'] ?? widget.lco['name'] ?? '')
         .toString()
         .trim();
@@ -1972,10 +2012,7 @@ class _LcoHomePageState extends State<LcoHomePage> {
           if (masterLcoId.isNotEmpty)
             Container(
               margin: const EdgeInsets.only(right: 8.0),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 4,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(20),
@@ -2011,7 +2048,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
 
           const SizedBox(width: 6),
         ],
-
       ),
 
       body: RefreshIndicator(
@@ -2028,281 +2064,294 @@ class _LcoHomePageState extends State<LcoHomePage> {
               child: loading
                   ? const Center(child: CircularProgressIndicator())
                   : ListView(
-                children: [
-                  // ───────── LCO header card ─────────
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      gradient: LinearGradient(
-                        colors: [AppTheme.primary, AppTheme.primaryLight],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primary.withOpacity(0.20),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // LEFT COLUMN: LCO details (takes remaining space)
-                            Expanded(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
+                        // ───────── LCO header card ─────────
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            gradient: LinearGradient(
+                              colors: [AppTheme.primary, AppTheme.primaryLight],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primary.withOpacity(0.20),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  CircleAvatar(
-                                    radius: 26,
-                                    backgroundColor: Colors.white.withOpacity(0.16),
-                                    child: Text(
-                                      avatarInitial,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 20,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
+                                  // LEFT COLUMN: LCO details (takes remaining space)
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
                                       children: [
-                                        Text(
-                                          displayName.isNotEmpty ? displayName : '-',
-                                          style: const TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.white,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          (lcoDetails?['businessName'] ?? titleName)
-                                              .toString()
-                                              .trim()
-                                              .isNotEmpty
-                                              ? (lcoDetails?['businessName'] ?? titleName)
-                                              .toString()
-                                              : '-',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.white.withOpacity(0.85),
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.phone,
-                                              size: 14,
-                                              color: Colors.white.withOpacity(0.85),
+                                        CircleAvatar(
+                                          radius: 26,
+                                          backgroundColor: Colors.white
+                                              .withOpacity(0.16),
+                                          child: Text(
+                                            avatarInitial,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 20,
                                             ),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                phoneText,
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: Colors.white.withOpacity(0.9),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                displayName.isNotEmpty
+                                                    ? displayName
+                                                    : '-',
+                                                style: const TextStyle(
+                                                  fontSize: 17,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Colors.white,
                                                 ),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(width: 8),
-
-                            // RIGHT COLUMN: Settlement mini card (fixed max width, no flex)
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(
-                                maxWidth: 150, // safe on mobile, prevents overflow
-                              ),
-                              child: Container(
-                                padding:
-                                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.16),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.24),
-                                    width: 0.7,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Row 1: icon + "Settlement"
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: const [
-                                        Icon(
-                                          Icons.account_balance_wallet_rounded,
-                                          size: 14,
-                                          color: Colors.white,
-                                        ),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'Settlement',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                (lcoDetails?['businessName'] ??
+                                                            titleName)
+                                                        .toString()
+                                                        .trim()
+                                                        .isNotEmpty
+                                                    ? (lcoDetails?['businessName'] ??
+                                                              titleName)
+                                                          .toString()
+                                                    : '-',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.white
+                                                      .withOpacity(0.85),
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.phone,
+                                                    size: 14,
+                                                    color: Colors.white
+                                                        .withOpacity(0.85),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Expanded(
+                                                    child: Text(
+                                                      phoneText,
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        color: Colors.white
+                                                            .withOpacity(0.9),
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 2),
+                                  ),
 
-                                    // Row 2: subtitle
-                                    const Text(
-                                      'payable to you',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w400,
-                                        color: Colors.white,
-                                      ),
+                                  const SizedBox(width: 8),
+
+                                  // RIGHT COLUMN: Settlement mini card (fixed max width, no flex)
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth:
+                                          150, // safe on mobile, prevents overflow
                                     ),
-                                    const SizedBox(height: 6),
-
-                                    // Row 3: Amount (auto-fits inside 150px)
-                                    FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerRight,
-                                      child: Text(
-                                        '₹${currencyFormat.format(settlementAmount)}',
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.white,
-                                          height: 1.1,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.16),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: Colors.white.withOpacity(0.24),
+                                          width: 0.7,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Row 1: icon + "Settlement"
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: const [
+                                              Icon(
+                                                Icons
+                                                    .account_balance_wallet_rounded,
+                                                size: 14,
+                                                color: Colors.white,
+                                              ),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                'Settlement',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
 
+                                          // Row 2: subtitle
+                                          const Text(
+                                            'payable to you',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w400,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
 
-                          ],
-                        ),
-
-                        const SizedBox(height: 6),
-
-                        // ───── chips row: district, PIN ─────
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            if (district.isNotEmpty)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.location_on_outlined,
-                                      size: 14,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      district,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.white,
+                                          // Row 3: Amount (auto-fits inside 150px)
+                                          FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerRight,
+                                            child: Text(
+                                              '₹${currencyFormat.format(settlementAmount)}',
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w900,
+                                                color: Colors.white,
+                                                height: 1.1,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            if (pincode.isNotEmpty)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.markunread_mailbox_outlined,
-                                      size: 14,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'PIN $pincode',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.white,
+
+                              const SizedBox(height: 6),
+
+                              // ───── chips row: district, PIN ─────
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  if (district.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.location_on_outlined,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            district,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  if (pincode.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.markunread_mailbox_outlined,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'PIN $pincode',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
                               ),
-                          ],
+                            ],
+                          ),
                         ),
+
+                        const SizedBox(height: 16),
+
+                        _buildHeaderCard(maxContentWidth),
+                        const SizedBox(height: 14),
+
+                        _buildNetworksList(maxContentWidth),
+                        const SizedBox(height: 14),
+
+                        _buildNetworkFeeCard(maxContentWidth),
+                        const SizedBox(height: 14),
+
+                        _buildSettlementCard(maxContentWidth),
+                        const SizedBox(height: 12),
+
+                        const Text(
+                          'LCO dashboard: tap Manage to edit networks. Use per-network metrics above.',
+                          style: TextStyle(color: AppTheme.muted, fontSize: 12),
+                        ),
+                        const SizedBox(height: 28),
                       ],
                     ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _buildHeaderCard(maxContentWidth),
-                  const SizedBox(height: 14),
-
-                  _buildNetworksList(maxContentWidth),
-                  const SizedBox(height: 14),
-
-                  _buildNetworkFeeCard(maxContentWidth),
-                  const SizedBox(height: 14),
-
-                  _buildSettlementCard(maxContentWidth),
-                  const SizedBox(height: 12),
-
-                  const Text(
-                    'LCO dashboard: tap Manage to edit networks. Use per-network metrics above.',
-                    style:
-                    TextStyle(color: AppTheme.muted, fontSize: 12),
-                  ),
-                  const SizedBox(height: 28),
-                ],
-              ),
             ),
           ),
         ),

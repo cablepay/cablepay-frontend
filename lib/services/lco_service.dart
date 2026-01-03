@@ -79,10 +79,22 @@ class LcoService {
   }
 
   /// GET /api/lcos/:id/stats
-  static Future<Map<String, dynamic>> getLcoStats(String lcoId) async {
-    final res = await ApiConfig.get('/api/lcos/$lcoId/stats');
+  /// GET /api/lcos/:id/stats[?period=YYYY-MM]
+  static Future<Map<String, dynamic>> getLcoStats(
+      String lcoId, {
+        String? period,
+      }) async {
+    var path = '/api/lcos/$lcoId/stats';
+
+    if (period != null && period.trim().isNotEmpty) {
+      final enc = Uri.encodeComponent(period.trim());
+      path += '?period=$enc';
+    }
+
+    final res = await ApiConfig.get(path);
     return {'statusCode': res['statusCode'], 'data': res['body']};
   }
+
 
   /// GET /api/lcos/:id/finance
   static Future<Map<String, dynamic>> getLcoFinancials(

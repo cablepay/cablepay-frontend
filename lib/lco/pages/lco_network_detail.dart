@@ -7,11 +7,13 @@ import '../../services/lco_service.dart';
 class NetworkDetailPage extends StatefulWidget {
   final String lcoId;
   final Map<String, dynamic> network;
+  final String? period;
 
   const NetworkDetailPage({
     Key? key,
     required this.lcoId,
     required this.network,
+    this.period,
   }) : super(key: key);
 
   @override
@@ -72,7 +74,7 @@ class _NetworkDetailPageState extends State<NetworkDetailPage> {
         return;
       }
 
-      final res = await LcoService.getNetworkCustomers(widget.lcoId, networkId);
+      final res = await LcoService.getNetworkCustomers(widget.lcoId, networkId,period: widget.period);
       if (res['statusCode'] == 200 && res['data'] != null) {
         final data = res['data'] as Map<String, dynamic>;
         final rawList = (data['customers'] as List? ?? []);

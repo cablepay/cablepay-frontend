@@ -315,36 +315,57 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                                       size: 20,
                                       color: AppTheme.muted,
                                     ),
-                                    onPressed: () async {
-                                      if (!r.isExisting) {
-                                        setState(() => r.isUserNameVisible = !r.isUserNameVisible);
-                                        return;
-                                      }
+                                      onPressed: () async {
+                                        if (!r.isExisting) {
+                                          setState(() => r.isUserNameVisible = !r.isUserNameVisible);
+                                          return;
+                                        }
 
-                                      final lcoId = widget.lco['_id']?.toString();
-                                      if (lcoId == null) return;
-
-                                      final res = await LcoService.getNetworkCredentials(
-                                        lcoId,
-                                        r.lcoIdCtrl.text,
-                                      );
-
-                                      if (!mounted) return;
-
-                                      if (res['statusCode'] == 200) {
-                                        r.userNameCtrl.text = res['data']['userName'] ?? '';
-                                        r.passwordCtrl.text = res['data']['password'] ?? '';
-
-                                        setState(() {
-                                          r.isUserNameVisible = true;
-                                          r.isPasswordVisible = true;
-                                        });
-                                      } else {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Unable to load credentials')),
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title: const Text('Show credentials?'),
+                                            content: const Text(
+                                              'This will reveal sensitive login credentials. Make sure no one else is watching.',
+                                            ),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Show')),
+                                            ],
+                                          ),
                                         );
+
+                                        if (confirm != true) return;
+
+                                        final lcoId = widget.lco['_id']?.toString();
+                                        if (lcoId == null) return;
+
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Loading credentials...')),
+                                        );
+
+                                        final res = await LcoService.getNetworkCredentials(
+                                          lcoId,
+                                          r.lcoIdCtrl.text,
+                                        );
+
+                                        if (!mounted) return;
+
+                                        if (res['statusCode'] == 200) {
+                                          r.userNameCtrl.text = res['data']['userName'] ?? '';
+                                          r.passwordCtrl.text = res['data']['password'] ?? '';
+
+                                          setState(() {
+                                            r.isUserNameVisible = true;
+                                            r.isPasswordVisible = true;
+                                          });
+                                        } else {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Unable to load credentials')),
+                                          );
+                                        }
                                       }
-                                    },
+
                                   ),
                                 ),
                                 validator: (v) {

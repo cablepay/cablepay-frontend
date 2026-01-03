@@ -19,7 +19,6 @@ import 'customer_history.dart';
 import '../../core/safe_state.dart';
 import '../../core/date_utils.dart';
 
-
 class CustomerHomePage extends StatefulWidget {
   final Map<String, dynamic> customer;
   const CustomerHomePage({Key? key, required this.customer}) : super(key: key);
@@ -74,8 +73,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     await _loadBoxes();
     await _loadWalletForCard();
   }
-
-
 
   Future<void> _loadBoxes() async {
     if (!_hasSession) return;
@@ -136,18 +133,43 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     }
   }
 
-  bool _needsPayment(Map<String, dynamic> box) {
-    final status = (box['status'] ?? '').toString().toLowerCase();
-    if (status != 'active') return true;
-    final last = box['lastCutoffDate'];
-    if (last == null) return true;
+  bool _isPaidForCurrentMonth(Map<String, dynamic> box) {
+    final lastPaidAt = box['lastPaidAt'];
+    if (lastPaidAt == null) return false;
+
     try {
-      final DateTime dt = (last is DateTime)
-          ? last
-          : DateTime.parse(last.toString());
+      final DateTime paidDate = lastPaidAt is DateTime
+          ? lastPaidAt
+          : DateTime.parse(lastPaidAt.toString());
+
+      final now = DateTime.now();
+      final currentPeriod =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+      final paidPeriod =
+          '${paidDate.year}-${paidDate.month.toString().padLeft(2, '0')}';
+
+      return paidPeriod == currentPeriod;
+    } catch (_) {
+      return false;
+    }
+  }
+
+
+  bool _needsPayment(Map<String, dynamic> box) {
+    final billingStart = box['billingStart'];
+    if (billingStart == null) return true;
+
+    try {
+      final DateTime start = billingStart is DateTime
+          ? billingStart
+          : DateTime.parse(billingStart.toString());
+
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      return dt.isBefore(today);
+
+      // Allow payment ON or AFTER billing start
+      return !today.isBefore(DateTime(start.year, start.month, start.day));
     } catch (_) {
       return true;
     }
@@ -195,7 +217,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       } catch (e, st) {
         debugPrint('CustomerHome error: $e');
       }
-
     }
 
     return null;
@@ -888,17 +909,74 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     height: 50, // Comfortable tap target
                     child: (() {
                       // Extract backend status
+                      // final rawStatus = (box['status'] ?? '').toString().toLowerCase();
+                      //
+                      // // Conditions
+                      // final isActive = rawStatus == 'active' || rawStatus == 'succeeded';
+                      // final isProcessingState =
+                      //     rawStatus == 'pending' ||
+                      //         rawStatus == 'processing' ||
+                      //         rawStatus == 'waiting';
+                      //
+                      // // ---- CASE 1: ACTIVE → Show "Paid" ----
+                      // if (isActive) {
+                      //   return Container(
+                      //     width: double.infinity,
+                      //     height: 50,
+                      //     decoration: BoxDecoration(
+                      //       color: Colors.green.withOpacity(0.08),
+                      //       borderRadius: BorderRadius.circular(12),
+                      //       border: Border.all(color: Colors.green.withOpacity(0.2)),
+                      //     ),
+                      //     child: const Center(
+                      //       child: Text(
+                      //         'Paid',
+                      //         style: TextStyle(
+                      //           color: Colors.green,
+                      //           fontSize: 16,
+                      //           fontWeight: FontWeight.w700,
+                      //         ),
+                      //       ),
+                      //     ),
+                      //   );
+                      // }
+                      //
+                      // // ---- CASE 2: PROCESSING → Show "Processing…" ----
+                      // if (isProcessingState) {
+                      //   return Container(
+                      //     width: double.infinity,
+                      //     height: 50,
+                      //     decoration: BoxDecoration(
+                      //       color: Colors.amber.withOpacity(0.15),
+                      //       borderRadius: BorderRadius.circular(12),
+                      //       border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                      //     ),
+                      //     child: const Center(
+                      //       child: Text(
+                      //         'Paid…',
+                      //         style: TextStyle(
+                      //           color: Colors.orange,
+                      //           fontSize: 16,
+                      //           fontWeight: FontWeight.w700,
+                      //         ),
+                      //       ),
+                      //     ),
+                      //   );
+                      // }
+
                       final rawStatus = (box['status'] ?? '').toString().toLowerCase();
 
-                      // Conditions
-                      final isActive = rawStatus == 'active' || rawStatus == 'succeeded';
                       final isProcessingState =
                           rawStatus == 'pending' ||
                               rawStatus == 'processing' ||
                               rawStatus == 'waiting';
 
-                      // ---- CASE 1: ACTIVE → Show "Paid" ----
-                      if (isActive) {
+                      final isPaidThisMonth = _isPaidForCurrentMonth(box);
+
+
+
+                      // ---- CASE 1: PAID FOR CURRENT MONTH ----
+                      if (isPaidThisMonth) {
                         return Container(
                           width: double.infinity,
                           height: 50,
@@ -920,7 +998,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         );
                       }
 
-                      // ---- CASE 2: PROCESSING → Show "Processing…" ----
+// ---- CASE 2: PAYMENT DONE BUT BACKEND STILL PROCESSING ----
                       if (isProcessingState) {
                         return Container(
                           width: double.infinity,
@@ -943,7 +1021,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         );
                       }
 
-                      // ---- CASE 3: NOT ACTIVE + NOT PROCESSING → Show Pay Now ----
+// ---- CASE 3: NOT PAID FOR CURRENT MONTH → PAY NOW ----
                       return ElevatedButton(
                         onPressed: isProcessing
                             ? null
@@ -965,23 +1043,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                             strokeWidth: 2.5,
                           ),
                         )
-                            : LayoutBuilder(
-                          builder: (c, constraints) {
-                            final label = walletApplyActual > 0
-                                ? 'Pay Now • ${_formatWallet(netToPay)}'
-                                : 'Pay Now • ${_formatWallet(origPaise)}';
-                            return Text(
-                              label,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.4,
-                              ),
-                            );
-                          },
+                            : Text(
+                          'Pay Now • ${_formatWallet(origPaise)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       );
+
                     })(),
                   ),
                 ],
@@ -1308,8 +1378,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       if (cutoff == null) continue;
 
       try {
-        final DateTime cutoffDate =
-        cutoff is DateTime ? cutoff : DateTime.parse(cutoff.toString());
+        final DateTime cutoffDate = cutoff is DateTime
+            ? cutoff
+            : DateTime.parse(cutoff.toString());
 
         final diff = cutoffDate
             .difference(DateTime(now.year, now.month, now.day))
@@ -1362,7 +1433,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -1404,7 +1474,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           //   onPressed: _loadBoxes,
           //   icon: Icon(Icons.refresh, color: AppTheme.primary),
           // ),
-
           IconButton(
             icon: const Icon(Icons.notifications_none),
             color: AppTheme.primary,
@@ -1448,7 +1517,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                             children: [
                               // Single-line greeting: "Hello, Name"
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Hello, ${_customerNameSafe()}',
