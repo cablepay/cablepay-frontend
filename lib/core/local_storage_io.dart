@@ -5,6 +5,25 @@ class LocalStorage {
   static const String _customerKey = 'cablepay_customer';
   static const String _lcoKey = 'cablepay_lco';
   static const String _sessionKey = 'cablepay_session';
+  static const String _termsAcceptedKey = 'cablepay_terms_accepted';
+
+
+  static Future<void> setTermsAccepted(bool value) async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool(_termsAcceptedKey, value);
+    } catch (_) {}
+  }
+
+  static Future<bool> isTermsAccepted() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      return sp.getBool(_termsAcceptedKey) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
 
   // Customer helpers (unchanged)
   static Future<void> saveCustomer(Map<String, dynamic> customer) async {

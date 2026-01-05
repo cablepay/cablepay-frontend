@@ -465,9 +465,23 @@ class _LcoHomePageState extends State<LcoHomePage> {
         : <String, dynamic>{};
 
     // amounts always come from overall for now
-    final num totalAmt = _num(overall['totalAmountRupees']);
-    final num paidAmt = _num(overall['paidAmountRupees']);
-    final num notPaidAmt = _num(overall['notPaidAmountRupees']);
+    final periodFin = _currentPeriodFinancials();
+
+    final num totalAmt = _num(
+        financials?['overall']?['totalAmountRupees']
+    );
+
+
+    final num paidAmt = _num(
+        periodFin['incomeRupees'] ??
+            financials?['overall']?['paidAmountRupees']
+    );
+
+    final num notPaidAmt = _num(
+        periodFin['remainingRupees'] ??
+            financials?['overall']?['notPaidAmountRupees']
+    );
+
 
     // ---------- 2. Per-period customer summary ----------
     final periodKey = _overviewPeriodKey;

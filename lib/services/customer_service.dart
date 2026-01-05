@@ -56,6 +56,16 @@ class CustomerService {
   }
 
 
+  static Future<Map<String, dynamic>> getOperatorPhone(String customerId) async {
+    final res = await ApiConfig.get('/api/customers/$customerId/operator-phone');
+    return {
+      'statusCode': res['statusCode'],
+      'data': res['body'],
+    };
+  }
+
+
+
   /// Create Box (accepts XFile for cross-platform compatibility)
   /// imageFile: XFile? (from image_picker). If null, sending JSON payload.
   static Future<Map<String, dynamic>> createBox(String customerId,

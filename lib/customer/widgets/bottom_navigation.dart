@@ -47,9 +47,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
   @override
   Widget build(BuildContext context) {
     final customer = widget.customer;
-    final operatorPhone = (customer['operatorPhone'] ?? '').toString().trim();
-
-
+    final customerId = (customer['_id'] ?? customer['id'] ?? '').toString();
     // Responsive scale: keep behavior identical to your original but avoid
     // extremely small results by clamping sensibly.
     final screenWidth = MediaQuery.of(context).size.width;
@@ -61,9 +59,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
     final pages = <Widget>[
       CustomerHomePage(customer: customer),
       CustomerHistoryPage(customer: customer, boxId: null),
-      CallPage(
-        operatorPhone: operatorPhone ?? '',
-      ),
+      CallPage(customerId: customerId),
       ReferralPage(customer: customer),
       ChatPage(customer: customer),
     ];

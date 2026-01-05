@@ -1,10 +1,14 @@
-// Minimal fallback to avoid missing export errors in weird environments.
-import 'dart:convert';
 
 class LocalStorage {
-  static const String _customerKey = 'cablepay_customer';
-  static const String _lcoKey = 'cablepay_lco';
-  static const String _sessionKey = 'cablepay_session';
+  // static const String _customerKey = 'cablepay_customer';
+  // static const String _lcoKey = 'cablepay_lco';
+  // static const String _sessionKey = 'cablepay_session';
+  // static const String _termsAcceptedKey = 'cablepay_terms_accepted';
+
+
+  static Future<void> setTermsAccepted(bool value) async {}
+  static Future<bool> isTermsAccepted() async => false;
+
 
   static Future<void> saveCustomer(Map<String, dynamic> customer) async {
     // no-op fallback
@@ -28,4 +32,6 @@ class LocalStorage {
   static Future<void> saveSession(Map<String, dynamic> session) async {}
   static Future<Map<String, dynamic>?> getSession() async => null;
   static Future<void> clearSession() async {}
+
+
 }

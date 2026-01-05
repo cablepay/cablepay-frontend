@@ -12,6 +12,7 @@ import '../core/app_theme.dart';
 import '../core/local_storage.dart';
 import '../core/api_config.dart';
 import '../main.dart';
+import 'common/terms_and_privacy_page.dart';
 
 const Color _teal = Color(0xFF22C1A9);
 const Color _navyText = Color(0xFF092D4A);
@@ -104,14 +105,29 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
+    // Navigator.of(context).pushReplacement(
+    //   PageRouteBuilder(
+    //     pageBuilder: (_, __, ___) => const StartupRouter(),
+    //     transitionsBuilder: (_, anim, __, child) =>
+    //         FadeTransition(opacity: anim, child: child),
+    //     transitionDuration: const Duration(milliseconds: 400),
+    //   ),
+    // );
+
+    final accepted = await LocalStorage.isTermsAccepted();
+
+    if (!mounted) return;
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const StartupRouter(),
+        pageBuilder: (_, __, ___) =>
+        accepted ? const StartupRouter() : const TermsAndPrivacyPage(),
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 400),
       ),
     );
+
   }
 
   @override

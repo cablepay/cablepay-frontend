@@ -1,17 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/api_config.dart';
 
-class CallPage extends StatelessWidget {
-  /// 🔹 Operator number (varies per LCO / user)
-  final String operatorPhone;
 
-  /// 🔹 Backend support number (same for all users)
-  static const String supportPhone = '1800123456';
+class CallPage extends StatefulWidget {
+  /// Customer ID (required to resolve LCO via backend)
+  final String customerId;
 
   const CallPage({
     super.key,
-    required this.operatorPhone,
+    required this.customerId,
   });
+
+  @override
+  State<CallPage> createState() => _CallPageState();
+}
+
+class _CallPageState extends State<CallPage> {
+  static const String supportPhone = '1800123456';
+
+  bool _loading = true;
+  String? _operatorPhone;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchOperatorPhone();
+  }
+
+  Future<void> _fetchOperatorPhone() async {
+    try {
+      final res = await ApiConfig.get(
+        '/api/customers/${widget.customerId}/operator-phone',
+      );
+
+      if (res['statusCode'] == 200 &&
+          res['body'] != null &&
+          res['body']['operatorPhone'] != null) {
+        _operatorPhone = res['body']['operatorPhone'].toString();
+      } else {
+        _error = 'Operator number not available';
+      }
+    } catch (e) {
+      _error = 'Failed to load operator contact';
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
   Future<void> _call(String phone) async {
     final uri = Uri.parse('tel:$phone');
@@ -23,8 +61,11 @@ class CallPage extends StatelessWidget {
   Widget _callRow({
     required String title,
     required String subtitle,
-    required String phone,
+    required String? phone,
+    bool enabled = true,
   }) {
+    final isEnabled = enabled && phone != null && phone.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -41,7 +82,6 @@ class CallPage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          /// LEFT CONTENT
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,30 +103,36 @@ class CallPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  phone,
-                  style: const TextStyle(
+                  phone ?? 'Not available',
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.3,
+                    color: isEnabled
+                        ? Colors.black
+                        : Colors.grey.shade500,
                   ),
                 ),
               ],
             ),
           ),
 
-          /// RIGHT CALL BUTTON
           InkWell(
-            onTap: () => _call(phone),
+            onTap: isEnabled ? () => _call(phone!) : null,
             borderRadius: BorderRadius.circular(50),
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: isEnabled
+                    ? Colors.green.shade50
+                    : Colors.grey.shade200,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.call,
-                color: Colors.green.shade700,
+                color: isEnabled
+                    ? Colors.green.shade700
+                    : Colors.grey.shade500,
                 size: 22,
               ),
             ),
@@ -106,7 +152,9 @@ class CallPage extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
@@ -126,19 +174,32 @@ class CallPage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            /// 🔹 YOUR OPERATOR (dynamic per LCO)
+            /// 🔹 Operator (from backend)
             _callRow(
               title: 'Your Operator',
               subtitle: 'Local service operator',
-              phone: operatorPhone,
+              phone: _operatorPhone,
+              enabled: _operatorPhone != null,
             ),
 
-            /// 🔹 BACKEND SUPPORT (same for all)
+            /// 🔹 Platform support (always available)
             _callRow(
               title: 'CablePay Support',
               subtitle: 'Central support team',
               phone: supportPhone,
+              enabled: true,
             ),
+
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: TextStyle(
+                  color: Colors.red.shade600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ],
         ),
       ),

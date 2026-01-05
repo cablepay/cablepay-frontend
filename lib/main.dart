@@ -3,6 +3,7 @@ import 'package:cable_pay/lco/widgets/lco_bottom_navigation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'common/terms_and_privacy_page.dart';
 import 'core/app_theme.dart';
 import 'core/local_storage.dart';
 import 'core/api_config.dart';
@@ -54,6 +55,49 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+// class _EntryGate extends StatefulWidget {
+//   const _EntryGate();
+//
+//   @override
+//   State<_EntryGate> createState() => _EntryGateState();
+// }
+//
+// class _EntryGateState extends State<_EntryGate> {
+//   bool _loading = true;
+//   bool _accepted = false;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     _check();
+//   }
+//
+//   Future<void> _check() async {
+//     final accepted = await LocalStorage.isTermsAccepted();
+//     if (!mounted) return;
+//     setState(() {
+//       _accepted = accepted;
+//       _loading = false;
+//     });
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     if (_loading) {
+//       return const Scaffold(
+//         body: Center(child: CircularProgressIndicator()),
+//       );
+//     }
+//
+//     if (!_accepted) {
+//       return const TermsAndPrivacyPage();
+//     }
+//
+//     return const SplashScreen();
+//   }
+// }
+
 
 /// StartupRouter left unchanged — splash will navigate to this widget
 class StartupRouter extends StatefulWidget {
