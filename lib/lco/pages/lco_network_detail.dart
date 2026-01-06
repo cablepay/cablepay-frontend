@@ -238,32 +238,16 @@ class _NetworkDetailPageState extends State<NetworkDetailPage> {
 
   Widget _buildCustomerCard(Map<String, dynamic> c) {
     final isPaid = c['isPaid'] == true;
-    // final amountDue = c['amountDue']; // rupees
     final name = c['name'] ?? '-';
     final phone = c['phone'] ?? '-';
     final boxes = (c['boxes'] as List? ?? []).cast<Map<String, dynamic>>();
 
-    // final tagBg = isPaid
-    //     ? Colors.green.withOpacity(0.10)
-    //     : Colors.red.withOpacity(0.08);
-    // final tagColor = isPaid ? Colors.green : Colors.redAccent;
-    // final tagText = isPaid ? 'PAID' : 'PENDING';
-
-    final backendPaid = c['isPaid'] == true;
     final amountDue = c['amountDue'];
 
-    final bool gracePending =
-        !backendPaid &&
-            (amountDue == null || (amountDue is num && amountDue <= 0)) &&
-            _isWithinGracePeriod();
 
-    final bool effectivePaid = backendPaid || gracePending;
 
-    final tagText = effectivePaid ? 'PAID' : 'PENDING';
-    final tagColor = effectivePaid ? Colors.green : Colors.redAccent;
-    final tagBg = effectivePaid
-        ? Colors.green.withOpacity(0.10)
-        : Colors.red.withOpacity(0.08);
+    final bool effectivePaid = c['isPaid'] == true;
+
 
 
     final dueRupees = () {
@@ -297,7 +281,7 @@ class _NetworkDetailPageState extends State<NetworkDetailPage> {
                 width: 4,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: isPaid ? Colors.green : Colors.orangeAccent,
+                  color: effectivePaid ? Colors.green : Colors.orangeAccent,
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
@@ -338,33 +322,33 @@ class _NetworkDetailPageState extends State<NetworkDetailPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                decoration: BoxDecoration(
-                  color: tagBg,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isPaid
-                          ? Icons.verified_rounded
-                          : Icons.warning_amber_rounded,
-                      size: 14,
-                      color: tagColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      tagText,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: tagColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // Container(
+              //   padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              //   decoration: BoxDecoration(
+              //     color: tagBg,
+              //     borderRadius: BorderRadius.circular(999),
+              //   ),
+              //   child: Row(
+              //     children: [
+              //       Icon(
+              //         effectivePaid
+              //             ? Icons.verified_rounded
+              //             : Icons.warning_amber_rounded,
+              //         size: 14,
+              //         color: tagColor,
+              //       ),
+              //       const SizedBox(width: 4),
+              //       Text(
+              //         tagText,
+              //         style: TextStyle(
+              //           fontSize: 11,
+              //           fontWeight: FontWeight.w700,
+              //           color: tagColor,
+              //         ),
+              //       ),
+              //     ],
+              //   ),
+              // ),
             ],
           ),
 
@@ -492,8 +476,7 @@ class _NetworkDetailPageState extends State<NetworkDetailPage> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            // color: isPaid ? Colors.green : Colors.redAccent,
-                              color: effectivePaid ? Colors.green : Colors.redAccent,
+                            color: AppTheme.text,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -552,7 +535,7 @@ class _NetworkDetailPageState extends State<NetworkDetailPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: isPaid ? Colors.green : Colors.redAccent,
+                  color: AppTheme.text,
                 ),
               ),
             ],
