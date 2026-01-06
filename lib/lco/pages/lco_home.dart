@@ -502,83 +502,54 @@ class _LcoHomePageState extends State<LcoHomePage> {
       }
     }
 
-    // If backend doesn't have that period yet, fall back to overall
-    // final int totalCust = (periodSummary['totalCustomers'] ??
-    //     overall['totalCustomers'] ??
-    //     0) is num
-    //     ? (periodSummary['totalCustomers'] ??
-    //     overall['totalCustomers'] ??
-    //     0) as int
-    //     : int.tryParse(
-    //     (periodSummary['totalCustomers'] ??
-    //         overall['totalCustomers'] ??
-    //         '0')
-    //         .toString()) ??
-    //     0;
-    //
-    // final int paidCust = (periodSummary['paidCustomers'] ??
-    //     overall['paidCustomers'] ??
-    //     0) is num
-    //     ? (periodSummary['paidCustomers'] ??
-    //     overall['paidCustomers'] ??
-    //     0) as int
-    //     : int.tryParse(
-    //     (periodSummary['paidCustomers'] ??
-    //         overall['paidCustomers'] ??
-    //         '0')
-    //         .toString()) ??
-    //     0;
-    //
-    // final int notPaidCust = (periodSummary['notPaidCustomers'] ??
-    //     overall['notPaidCustomers'] ??
-    //     (totalCust - paidCust)) is num
-    //     ? (periodSummary['notPaidCustomers'] ??
-    //     overall['notPaidCustomers'] ??
-    //     (totalCust - paidCust)) as int
-    //     : int.tryParse(
-    //     (periodSummary['notPaidCustomers'] ??
-    //         overall['notPaidCustomers'] ??
-    //         (totalCust - paidCust))
-    //         .toString()) ??
-    //     (totalCust - paidCust);
 
     // ---------- 3. Overall stats (new / referred) ----------
 
 
-    // NEW / REFERRED must be period-aware
-    int newCust = 0;
-    int referredCust = 0;
+    // // NEW / REFERRED must be period-aware
+    // int newCust = 0;
+    // int referredCust = 0;
+    //
+    // final periodStatsArr = stats?['networks'];
+    // if (periodStatsArr is List) {
+    //   for (final e in periodStatsArr) {
+    //     if (e is Map) {
+    //       newCust += _int(e['newCustomers']);
+    //       referredCust += _int(e['referredCustomers']);
+    //     }
+    //   }
+    // }
 
-    final periodStatsArr = stats?['networks'];
-    if (periodStatsArr is List) {
-      for (final e in periodStatsArr) {
-        if (e is Map) {
-          newCust += _int(e['newCustomers']);
-          referredCust += _int(e['referredCustomers']);
-        }
-      }
-    }
 
 
-
-    final overallStatsDyn = stats?['overall'];
-    final Map<String, dynamic> overallStats = (overallStatsDyn is Map)
-        ? Map<String, dynamic>.from(overallStatsDyn as Map)
-        : <String, dynamic>{};
+    // final overallStatsDyn = stats?['overall'];
+    // final Map<String, dynamic> overallStats = (overallStatsDyn is Map)
+    //     ? Map<String, dynamic>.from(overallStatsDyn as Map)
+    //     : <String, dynamic>{};
 
     // Always normalize numbers BEFORE math
-    final int totalCust = _int(
-      periodSummary['totalCustomers'] ?? overall['totalCustomers'],
-    );
+    // final int totalCust = _int(
+    //   periodSummary['totalCustomers'] ?? overall['totalCustomers'],
+    // );
+    //
+    // final int paidCust = _int(
+    //   periodSummary['paidCustomers'] ?? overall['paidCustomers'],
+    // );
+    //
+    // final int notPaidCust = _int(
+    //   periodSummary['notPaidCustomers'] ??
+    //       (totalCust - paidCust >= 0 ? totalCust - paidCust : 0),
+    // );
 
-    final int paidCust = _int(
-      periodSummary['paidCustomers'] ?? overall['paidCustomers'],
-    );
+    final overallStats = stats?['overall'] as Map<String, dynamic>? ?? {};
 
-    final int notPaidCust = _int(
-      periodSummary['notPaidCustomers'] ??
-          (totalCust - paidCust >= 0 ? totalCust - paidCust : 0),
-    );
+    final int totalCust = _int(overallStats['totalCustomers']);
+    final int paidCust  = _int(overallStats['paidCustomers']);
+    final int notPaidCust = totalCust - paidCust;
+
+
+    final int newCust = _int(overallStats['newCustomers']);
+    final int referredCust = _int(overallStats['referredCustomers']);
 
 
     // final int newCust = _int(overallStats['newCustomers']);
