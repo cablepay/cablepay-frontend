@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/logout_helper.dart';
 import '../pages/profile_page.dart';
 import 'bottom_navigation.dart';
+import '../pages/customer_settings_page.dart';
 
 /// Polished side drawer with responsive width and a dedicated logout area.
 /// CORRECTED: Adjusted layout to prevent Bottom Navigation overlap on the Logout button.
@@ -225,6 +226,21 @@ class SideMenu extends StatelessWidget {
                       );
                     },
                   ),
+                  _buildTile(
+                    context,
+                    icon: Icons.settings,
+                    label: 'Settings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CustomerSettingsPage(customer: customer ?? {}),
+                        ),
+                      );
+                    },
+                  ),
+
                 ],
               ),
             ),

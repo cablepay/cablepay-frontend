@@ -522,24 +522,24 @@ class _NetworkDetailPageState extends State<NetworkDetailPage> {
             }).toList(),
           ),
 
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Total due',
-                style: TextStyle(fontSize: 12, color: AppTheme.muted),
-              ),
-              Text(
-                dueRupees <= 0 ? '-' : '₹${currencyFormat.format(dueRupees)}',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.text,
-                ),
-              ),
-            ],
-          ),
+          // const SizedBox(height: 8),
+          // Row(
+          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          //   children: [
+          //     const Text(
+          //       'Total due',
+          //       style: TextStyle(fontSize: 12, color: AppTheme.muted),
+          //     ),
+          //     Text(
+          //       dueRupees <= 0 ? '-' : '₹${currencyFormat.format(dueRupees)}',
+          //       style: TextStyle(
+          //         fontSize: 14,
+          //         fontWeight: FontWeight.w700,
+          //         color: AppTheme.text,
+          //       ),
+          //     ),
+          //   ],
+          // ),
         ],
       ),
     );
@@ -943,7 +943,7 @@ class _NetworkDetailPageState extends State<NetworkDetailPage> {
             children: [
               Expanded(
                 child: _amountTile(
-                  title: 'Total billed',
+                  title: 'Total Customer Payable',
                   amountRupees: displayTotalAmt,
                   textColor: Colors.white,
                 ),

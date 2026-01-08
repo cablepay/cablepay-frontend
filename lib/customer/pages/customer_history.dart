@@ -14,18 +14,27 @@ class CustomerHistoryPage extends StatefulWidget {
   State<CustomerHistoryPage> createState() => _CustomerHistoryPageState();
 }
 
-enum SortMode { serverOrder, recentPaidDesc, recentPaidAsc, unpaidFirst }
+enum SortMode { recentPaidDesc, recentPaidAsc }
 
 class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
   bool loading = true;
   String? error;
   List<dynamic> boxes = [];
 
-  SortMode _sortMode = SortMode.serverOrder;
+  SortMode _sortMode = SortMode.recentPaidDesc;
+
 
   // Formatters
-  final NumberFormat money0 = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
-  final NumberFormat money2 = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
+  final NumberFormat money0 = NumberFormat.currency(
+    locale: 'en_IN',
+    symbol: '₹',
+    decimalDigits: 0,
+  );
+  final NumberFormat money2 = NumberFormat.currency(
+    locale: 'en_IN',
+    symbol: '₹',
+    decimalDigits: 2,
+  );
   final DateFormat dtDisplay = DateFormat('dd MMM yyyy, hh:mm a');
   final DateFormat shortDate = DateFormat('dd MMM yyyy');
   final DateFormat monthDisplay = DateFormat('MMMM yyyy');
@@ -60,21 +69,33 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
     }
 
     try {
-      final res = await CustomerService.getPaymentHistory(customerId.toString(), boxId: widget.boxId);
+      final res = await CustomerService.getPaymentHistory(
+        customerId.toString(),
+        boxId: widget.boxId,
+      );
       if (res['statusCode'] == 200) {
         final data = res['data'];
         setState(() {
-          boxes = (data != null && data['boxes'] is List) ? data['boxes'] as List<dynamic> : [];
+          boxes = (data != null && data['boxes'] is List)
+              ? data['boxes'] as List<dynamic>
+              : [];
         });
       } else {
         final body = res['data'];
         setState(() {
-          error = (body is Map && body['error'] != null) ? body['error'].toString() : 'Failed to load history';
+          error = (body is Map && body['error'] != null)
+              ? body['error'].toString()
+              : 'Failed to load history';
         });
       }
     } catch (e) {
+      final msg = e.toString().toLowerCase();
       setState(() {
-        error = 'Network error: $e';
+        if (msg.contains('socket') || msg.contains('network')) {
+          error = 'No internet connection';
+        } else {
+          error = 'Server under maintenance';
+        }
       });
     } finally {
       setState(() {
@@ -101,7 +122,10 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
   String _fmtDateTime(dynamic v) {
     if (v == null) return '-';
     try {
-      if (v is int) return dtDisplay.format(DateTime.fromMillisecondsSinceEpoch(v).toLocal());
+      if (v is int)
+        return dtDisplay.format(
+          DateTime.fromMillisecondsSinceEpoch(v).toLocal(),
+        );
       return dtDisplay.format(DateTime.parse(v.toString()).toLocal());
     } catch (_) {
       return v.toString();
@@ -111,7 +135,10 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
   String _fmtShortDate(dynamic v) {
     if (v == null) return '-';
     try {
-      if (v is int) return shortDate.format(DateTime.fromMillisecondsSinceEpoch(v).toLocal());
+      if (v is int)
+        return shortDate.format(
+          DateTime.fromMillisecondsSinceEpoch(v).toLocal(),
+        );
       return shortDate.format(DateTime.parse(v.toString()).toLocal());
     } catch (_) {
       return v.toString();
@@ -132,47 +159,63 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
   }
 
   // sort boxes by selected mode (returns new list)
-  List<dynamic> _sortedBoxes() {
-    final List<dynamic> copy = boxes.map((b) => b).toList();
-    if (_sortMode == SortMode.serverOrder) return copy;
-
-    int paidAtForBox(dynamic box) {
-      final months = (box['months'] is List) ? (box['months'] as List<dynamic>) : <dynamic>[];
-      int latest = 0;
-      for (final m in months) {
-        try {
-          if (m is Map && m['paid'] == true) {
-            final ts = (m['paidAtTs'] ?? (m['paidAtISO'] != null ? DateTime.parse(m['paidAtISO']).toUtc().millisecondsSinceEpoch : null));
-            if (ts is int && ts > latest) latest = ts;
-          }
-        } catch (_) {}
-      }
-      return latest;
-    }
-
-    if (_sortMode == SortMode.recentPaidDesc) {
-      copy.sort((a, b) => paidAtForBox(b).compareTo(paidAtForBox(a)));
-    } else if (_sortMode == SortMode.recentPaidAsc) {
-      copy.sort((a, b) => paidAtForBox(a).compareTo(paidAtForBox(b)));
-    } else if (_sortMode == SortMode.unpaidFirst) {
-      int unpaidCount(dynamic box) {
-        final months = (box['months'] is List) ? (box['months'] as List<dynamic>) : <dynamic>[];
-        return months.where((m) => !(m is Map && m['paid'] == true)).length;
-      }
-      copy.sort((a, b) => unpaidCount(b).compareTo(unpaidCount(a)));
-    }
-    return copy;
-  }
+  // List<dynamic> _sortedBoxes() {
+  //   final List<dynamic> copy = boxes.map((b) => b).toList();
+  //   if (_sortMode == SortMode.serverOrder) return copy;
+  //
+  //   int paidAtForBox(dynamic box) {
+  //     final months = (box['months'] is List) ? box['months'] as List : [];
+  //     int latest = 0;
+  //
+  //     for (final m in months) {
+  //       final ts = m['paidAtTs'];
+  //       if (ts is int && ts > latest) latest = ts;
+  //     }
+  //     return latest;
+  //   }
+  //
+  //   if (_sortMode == SortMode.recentPaidDesc) {
+  //     copy.sort((a, b) => paidAtForBox(b).compareTo(paidAtForBox(a)));
+  //   } else if (_sortMode == SortMode.recentPaidAsc) {
+  //     copy.sort((a, b) => paidAtForBox(a).compareTo(paidAtForBox(b)));
+  //   } else if (_sortMode == SortMode.unpaidFirst) {
+  //     int unpaidCount(dynamic box) {
+  //       final months = (box['months'] is List)
+  //           ? (box['months'] as List<dynamic>)
+  //           : <dynamic>[];
+  //       return months.where((m) => !(m is Map && m['paid'] == true)).length;
+  //     }
+  //
+  //     copy.sort((a, b) => unpaidCount(b).compareTo(unpaidCount(a)));
+  //   }
+  //   return copy;
+  // }
 
   // --- UI Components ---
 
   Widget _buildLabelValue(String label, String value, {bool alignEnd = false}) {
     return Column(
-      crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 11, color: _textGrey, fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: _textGrey,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(value, style: TextStyle(fontSize: 13, color: _textDark, fontWeight: FontWeight.w600)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            color: _textDark,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
@@ -182,7 +225,7 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
     final boxNo = (b['setupBoxNumber'] ?? b['boxId'])?.toString() ?? '-';
     final price = (_toPaise(b['pricePaise'] ?? b['price'] ?? 0) / 100.0);
 
-    final lco = b['lcoRef'];
+    final lco = b['lco'];
     String lcoText = '-';
     if (lco is Map) {
       lcoText = (lco['businessName'] ?? lco['name'])?.toString() ?? '-';
@@ -190,8 +233,11 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
       lcoText = b['lcoId'].toString();
     }
 
-    final lastCutoff = b['lastCutoffDate'] ?? b['lastCutoff'] ?? b['activeUntil'];
-    final isActive = (b['status'] ?? '').toString().toLowerCase() == 'active' || b['isActive'] == true;
+    final lastCutoff =
+        b['lastCutoffDate'] ?? b['lastCutoff'] ?? b['activeUntil'];
+    final isActive =
+        (b['status'] ?? '').toString().toLowerCase() == 'active' ||
+        b['isActive'] == true;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -199,7 +245,11 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
         color: _cardWhite,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
         border: Border.all(color: Colors.grey.withOpacity(0.1)),
       ),
@@ -210,8 +260,12 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: AppTheme.primary.withOpacity(0.05),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.1))),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              border: Border(
+                bottom: BorderSide(color: Colors.grey.withOpacity(0.1)),
+              ),
             ),
             child: Row(
               children: [
@@ -220,19 +274,31 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
                 Expanded(
                   child: Text(
                     boxNo,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: _textDark,
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: isActive ? _greenColor.withOpacity(0.1) : _orangeColor.withOpacity(0.1),
+                    color: isActive
+                        ? _greenColor.withOpacity(0.1)
+                        : _orangeColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircleAvatar(radius: 3, backgroundColor: isActive ? _greenColor : _orangeColor),
+                      CircleAvatar(
+                        radius: 3,
+                        backgroundColor: isActive ? _greenColor : _orangeColor,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         isActive ? 'ACTIVE' : 'INACTIVE',
@@ -260,19 +326,39 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(network, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _textDark)),
+                        Text(
+                          network,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: _textDark,
+                          ),
+                        ),
                         const SizedBox(height: 4),
-                        Text(lcoText, style: TextStyle(fontSize: 13, color: _textGrey)),
+                        Text(
+                          lcoText,
+                          style: TextStyle(fontSize: 13, color: _textGrey),
+                        ),
                       ],
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(_fmtAmount(price), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primary)),
+                        Text(
+                          _fmtAmount(price),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.primary,
+                          ),
+                        ),
                         const SizedBox(height: 4),
-                        const Text('/month', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        const Text(
+                          '/month',
+                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
                       ],
-                    )
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -281,8 +367,8 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildLabelValue("Last Cutoff", _fmtShortDate(lastCutoff)),
-                    _buildLabelValue("Total Paid", _fmtAmount((_toPaise(b['totalPaidPaise'] ?? b['totalPaid'] ?? 0) / 100.0)), alignEnd: true),
+                    _buildLabelValue("Next Cutoff", _fmtShortDate(lastCutoff)),
+                    // _buildLabelValue("Total Paid", _fmtAmount((_toPaise(b['totalPaidPaise'] ?? b['totalPaid'] ?? 0) / 100.0)), alignEnd: true),
                   ],
                 ),
               ],
@@ -297,7 +383,8 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
     final paid = m['paid'] == true;
     final amount = (_toPaise(m['amountPaise'] ?? m['amount'] ?? 0) / 100.0);
     final period = m['period'] ?? m['month'] ?? '';
-    final paidAt = m['paidAtIST'] ?? m['paidAtISO'] ?? m['paidAt'] ?? m['paidAtTs'];
+    final paidAt =
+        m['paidAtIST'] ?? m['paidAtISO'] ?? m['paidAt'] ?? m['paidAtTs'];
     final receiptUrl = m['receiptUrl']?.toString();
 
     final statusColor = paid ? _greenColor : _orangeColor;
@@ -309,7 +396,13 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
         color: _cardWhite,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.withOpacity(0.1)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -340,7 +433,11 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
                     children: [
                       Text(
                         _fmtMonthSafe(period),
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: _textDark,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -357,14 +454,22 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
                   children: [
                     Text(
                       _fmtAmount(amount),
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _textDark,
+                      ),
                     ),
                     if (paid && receiptUrl != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           'Receipt >',
-                          style: TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                   ],
@@ -414,13 +519,22 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
           isExpanded: true,
           icon: Icon(Icons.sort, color: _textGrey),
           value: _sortMode,
-          style: TextStyle(color: _textDark, fontSize: 14, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            color: _textDark,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
           items: const [
-            DropdownMenuItem(value: SortMode.serverOrder, child: Text('Sort by: Default')),
-            DropdownMenuItem(value: SortMode.recentPaidDesc, child: Text('Sort by: Recently Paid')),
-            DropdownMenuItem(value: SortMode.recentPaidAsc, child: Text('Sort by: Oldest Paid')),
-            DropdownMenuItem(value: SortMode.unpaidFirst, child: Text('Sort by: Unpaid First')),
+            DropdownMenuItem(
+              value: SortMode.recentPaidDesc,
+              child: Text('Newest payments first'),
+            ),
+            DropdownMenuItem(
+              value: SortMode.recentPaidAsc,
+              child: Text('Oldest payments first'),
+            ),
           ],
+
           onChanged: (v) {
             if (v == null) return;
             setState(() {
@@ -434,13 +548,17 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.customer['name'] ?? widget.customer['phone'] ?? 'Customer';
-    final visibleBoxes = _sortedBoxes();
+    final title =
+        widget.customer['name'] ?? widget.customer['phone'] ?? 'Customer';
+    final visibleBoxes = boxes;
 
     return Scaffold(
       backgroundColor: _bgGrey,
       appBar: AppBar(
-        title: const Text('History', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text(
+          'History',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         centerTitle: false,
         backgroundColor: AppTheme.primary,
         foregroundColor: _textDark,
@@ -449,72 +567,116 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
       body: loading
           ? Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : (error != null
-          ? Center(child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
-          const SizedBox(height: 16),
-          Text(error!, style: TextStyle(color: _textGrey)),
-          TextButton(onPressed: _loadHistory, child: const Text("Try Again"))
-        ],
-      ))
-          : RefreshIndicator(
-        onRefresh: _loadHistory,
-        color: AppTheme.primary,
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 32),
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              color: Colors.white,
-              child: Text(
-                'Showing transaction history for $title',
-                style: TextStyle(color: _textGrey, fontSize: 13),
-              ),
-            ),
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: Colors.red.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(error!, style: TextStyle(color: _textGrey)),
+                        TextButton(
+                          onPressed: _loadHistory,
+                          child: const Text("Try Again"),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadHistory,
+                    color: AppTheme.primary,
+                    child: ListView(
+                      padding: const EdgeInsets.only(bottom: 32),
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                          color: Colors.white,
+                          child: Text(
+                            'Showing transaction history for $title',
+                            style: TextStyle(color: _textGrey, fontSize: 13),
+                          ),
+                        ),
 
-            _buildSortControl(),
+                        _buildSortControl(),
 
-            if (visibleBoxes.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 60),
-                child: Column(
-                  children: [
-                    Icon(Icons.receipt_long_rounded, size: 64, color: Colors.grey.shade300),
-                    const SizedBox(height: 16),
-                    Text('No transaction history found', style: TextStyle(color: _textGrey, fontSize: 16)),
-                  ],
-                ),
-              )
-            else
-              ...visibleBoxes.map<Widget>((rawBox) {
-                final Map<String, dynamic> b = Map<String, dynamic>.from(rawBox as Map);
-                final months = (b['months'] is List) ? (b['months'] as List<dynamic>) : <dynamic>[];
-                final paid = months.where((m) => m is Map && m['paid'] == true).toList();
-                final unpaid = months.where((m) => !(m is Map && m['paid'] == true)).toList();
+                        if (visibleBoxes.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 60),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.receipt_long_rounded,
+                                  size: 64,
+                                  color: Colors.grey.shade300,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No transaction history found',
+                                  style: TextStyle(
+                                    color: _textGrey,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ...visibleBoxes.map<Widget>((rawBox) {
+                            final Map<String, dynamic> b =
+                                Map<String, dynamic>.from(rawBox as Map);
+                            final months = (b['months'] is List)
+                                ? (b['months'] as List<dynamic>)
+                                : <dynamic>[];
+                            // final paid = months.where((m) => m is Map && m['paid'] == true).toList();
+                            // final unpaid = months.where((m) => !(m is Map && m['paid'] == true)).toList();
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _boxHeaderCard(b),
+                            final paid = List<Map<String, dynamic>>.from(months);
 
-                    if (unpaid.isNotEmpty) ...[
-                      _buildSectionTitle('Pending Dues', _orangeColor, Icons.pending_actions),
-                      ...unpaid.map((m) => _monthCard(Map<String, dynamic>.from(m as Map))).toList(),
-                    ],
+                            if (_sortMode == SortMode.recentPaidDesc) {
+                              paid.sort((a, b) =>
+                                  (b['paidAtTs'] ?? 0).compareTo(a['paidAtTs'] ?? 0));
+                            }
 
-                    if (paid.isNotEmpty) ...[
-                      _buildSectionTitle('Completed Payments', _greenColor, Icons.verified),
-                      ...paid.map((m) => _monthCard(Map<String, dynamic>.from(m as Map))).toList(),
-                    ],
+                            if (_sortMode == SortMode.recentPaidAsc) {
+                              paid.sort((a, b) =>
+                                  (a['paidAtTs'] ?? 0).compareTo(b['paidAtTs'] ?? 0));
+                            }
 
-                    const SizedBox(height: 24), // Spacer between boxes
-                  ],
-                );
-              }).toList(),
-          ],
-        ),
-      )),
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _boxHeaderCard(b),
+
+                                // if (unpaid.isNotEmpty) ...[
+                                //   _buildSectionTitle('Pending Dues', _orangeColor, Icons.pending_actions),
+                                //   ...unpaid.map((m) => _monthCard(Map<String, dynamic>.from(m as Map))).toList(),
+                                // ],
+                                if (paid.isNotEmpty) ...[
+                                  _buildSectionTitle(
+                                    'Completed Payments',
+                                    _greenColor,
+                                    Icons.verified,
+                                  ),
+                                  ...paid.map((m) => _monthCard(m)).toList(),
+
+                                ],
+
+                                const SizedBox(
+                                  height: 24,
+                                ), // Spacer between boxes
+                              ],
+                            );
+                          }).toList(),
+                      ],
+                    ),
+                  )),
     );
   }
 }

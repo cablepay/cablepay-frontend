@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../lco/pages/lco_networks.dart';
 import '../../lco/widgets/lco_bottom_navigation.dart';
+import '../../lco/pages/lco_settings_page.dart';
 
 class LcoSideMenu extends StatelessWidget {
   final Map<String, dynamic> lco;
@@ -210,6 +211,22 @@ class LcoSideMenu extends StatelessWidget {
                     label: 'Profile',
                     onTap: () => _navigateBottom(context, 4),
                   ),
+
+                  _buildTile(
+                    context,
+                    icon: Icons.settings,
+                    label: 'Settings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LcoSettingsPage(lco: lco),
+                        ),
+                      );
+                    },
+                  ),
+
                 ],
               ),
             ),
