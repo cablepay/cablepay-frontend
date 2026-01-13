@@ -153,6 +153,8 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
         {
           'phone': phone,
           'otp': otp,
+          'name': _nameCtrl.text.trim(),
+          'email': _emailCtrl.text.trim(),
         },
       );
 

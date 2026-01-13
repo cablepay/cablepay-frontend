@@ -35,6 +35,14 @@ Future<void> main() async {
     );
   }
 
+  // 🔴 PRODUCTION BACKEND OVERRIDE (THIS IS MANDATORY)
+  if (kReleaseMode) {
+    ApiConfig.setHost(
+      'cablepay-backend-44811766138.asia-south1.run.app',
+      protocol: 'https',
+    );
+  }
+
   runApp(const MyApp());
 }
 
@@ -193,11 +201,20 @@ class _StartupRouterState extends State<StartupRouter> {
 
       if (_session != null) {
         final me = await ApiConfig.get('/api/auth/me');
-        if (me['statusCode'] != 200) {
+
+        if (me['statusCode'] == 200) {
+          // OK
+        } else if (me['statusCode'] == 401 || me['statusCode'] == 403) {
+          // Auth is truly invalid
           await LocalStorage.clearSession();
           _session = null;
+        } else {
+          // 🔴 DO NOT CLEAR SESSION
+          // backend might be warming up
+          debugPrint('WARN: /me failed with ${me['statusCode']}');
         }
       }
+
 
 
       // restore profiles depending on session type

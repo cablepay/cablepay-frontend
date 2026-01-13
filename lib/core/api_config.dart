@@ -27,8 +27,7 @@ class ApiConfig {
   static void setSessionKey(String? key) => sessionKey = key;
 
   static void setHost(String host, {int? hostPort, String protocol = 'http'}) {
-    final p = hostPort ?? port;
-    _overrideHost = '$host:$p';
+    _overrideHost = hostPort != null ? '$host:$hostPort' : host;
     _overrideProtocol = protocol;
   }
 
@@ -48,20 +47,21 @@ class ApiConfig {
       return '$proto://$_overrideHost';
     }
 
+    if (kReleaseMode) {
+      return 'https://cablepay-backend-44811766138.asia-south1.run.app';
+    }
+
     final backend = port;
 
     if (kIsWeb) {
       return 'http://localhost:$backend';
     }
 
-    // non-web: detect platform carefully
-    if (!kIsWeb && Platform.isAndroid) {
+    if (Platform.isAndroid) {
       final isEmu = _isAndroidEmulator();
-      if (isEmu) {
-        return 'http://10.0.2.2:$backend';
-      } else {
-        return 'http://$lanIp:$backend';
-      }
+      return isEmu
+          ? 'http://10.0.2.2:$backend'
+          : 'http://$lanIp:$backend';
     }
 
     // iOS simulator and other non-Android platforms
