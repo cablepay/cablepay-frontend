@@ -18,6 +18,8 @@ import 'customer_detail.dart';
 import 'customer_history.dart';
 import '../../core/safe_state.dart';
 import '../../core/date_utils.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+
 
 class CustomerHomePage extends StatefulWidget {
   final Map<String, dynamic> customer;
@@ -55,12 +57,27 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   bool get _hasSession => ApiConfig.sessionKey != null;
 
+  late Razorpay _razorpay;
+
+  Map<String, dynamic>? _pendingPaymentContext;
+
+
   // modify initState to fetch wallet for the card (keep existing calls)
+
+
   @override
   void initState() {
     super.initState();
+
+    _razorpay = Razorpay();
+
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (response) {});
+
     _init();
   }
+
 
   Future<void> _init() async {
     if (!_hasSession) {
@@ -398,43 +415,156 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     if (!mounted) return;
     setState(() => activating[idStr] = true);
 
+    // try {
+    //   final payload = <String, dynamic>{
+    //     'period': period,
+    //     'useWallet': useWalletFlag,
+    //   };
+    //   final apiRes = await ApiConfig.post(
+    //     '/api/customers/$customerId/boxes/$boxId/activate',
+    //     payload,
+    //   );
+    //
+    //   setState(() => activating[idStr] = false);
+    //
+    //   final statusCode = apiRes['statusCode'] as int? ?? 500;
+    //   final data = apiRes['body'];
+    //
+    //   if (statusCode == 200) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(content: Text('Payment succeeded — box activated')),
+    //     );
+    //     await _loadBoxes();
+    //     await _loadWalletForCard(); // refresh wallet after payment
+    //   } else {
+    //     final msg = (data is Map && data['error'] != null)
+    //         ? data['error'].toString()
+    //         : 'Payment failed';
+    //     ScaffoldMessenger.of(
+    //       context,
+    //     ).showSnackBar(SnackBar(content: Text(msg)));
+    //   }
+    // } catch (e) {
+    //   if (!mounted) return;
+    //   setState(() => activating[idStr] = false);
+    //   ScaffoldMessenger.of(
+    //     context,
+    //   ).showSnackBar(SnackBar(content: Text('Payment error: $e')));
+    // }
+
+
     try {
-      final payload = <String, dynamic>{
-        'period': period,
-        'useWallet': useWalletFlag,
-      };
-      final apiRes = await ApiConfig.post(
-        '/api/customers/$customerId/boxes/$boxId/activate',
-        payload,
+      // Step 1 – Create Razorpay Order from backend
+      final orderRes = await ApiConfig.post(
+        '/api/payments/create-order',
+        {
+          "boxId": boxId,
+          "period": period
+        },
       );
 
-      setState(() => activating[idStr] = false);
+      final data = orderRes['body'];
 
-      final statusCode = apiRes['statusCode'] as int? ?? 500;
-      final data = apiRes['body'];
-
-      if (statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment succeeded — box activated')),
-        );
-        await _loadBoxes();
-        await _loadWalletForCard(); // refresh wallet after payment
-      } else {
-        final msg = (data is Map && data['error'] != null)
-            ? data['error'].toString()
-            : 'Payment failed';
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
+      if (orderRes['statusCode'] != 200) {
+        throw Exception("Failed to create order");
       }
+
+      // Step 2 – Open Razorpay UI
+      var options = {
+        'key': data['key'],
+        'amount': data['amountPaise'],
+        'name': 'CablePay',
+        'description': 'Subscription Payment',
+        'order_id': data['orderId'],
+        'currency': 'INR',
+        'prefill': {
+          'contact': widget.customer['phone'] ?? ''
+        },
+        'theme': {
+          'color': '#3568B1'
+        }
+      };
+
+      // Store context for success callback
+      _pendingPaymentContext = {
+        "customerId": customerId,
+        "boxId": boxId,
+        "period": period,
+        "useWallet": useWalletFlag
+      };
+
+      _razorpay.open(options);
+
     } catch (e) {
       if (!mounted) return;
       setState(() => activating[idStr] = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Payment error: $e')));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Payment initiation failed: $e"))
+      );
+    }
+
+
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    final ctx = _pendingPaymentContext;
+
+    if (ctx == null) return;
+
+    try {
+      final payload = {
+        "period": ctx["period"],
+        "paymentId": response.paymentId,
+        "orderId": response.orderId,
+        "signature": response.signature,
+        "useWallet": ctx["useWallet"]
+      };
+
+      final apiRes = await ApiConfig.post(
+        '/api/customers/${ctx["customerId"]}/boxes/${ctx["boxId"]}/activate',
+        payload,
+      );
+
+      if (!mounted) return;
+
+      final statusCode = apiRes['statusCode'] as int? ?? 500;
+
+      if (statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment successful'))
+        );
+
+        await _loadBoxes();
+        await _loadWalletForCard();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment verification failed'))
+        );
+      }
+
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Verification error: $e"))
+      );
+    } finally {
+      _pendingPaymentContext = null;
     }
   }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Payment failed or cancelled"))
+    );
+
+    _pendingPaymentContext = null;
+  }
+
+
 
   // small helper used inside dialog
   Widget _rowLabelValue(String label, String value, {TextStyle? valueStyle}) {
@@ -1432,6 +1562,13 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       ],
     );
   }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
 
   @override
   Widget build(BuildContext context) {
