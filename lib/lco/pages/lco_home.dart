@@ -467,9 +467,12 @@ class _LcoHomePageState extends State<LcoHomePage> {
     // amounts always come from overall for now
     final periodFin = _currentPeriodFinancials();
 
-    final num totalAmt = _num(
-        financials?['overall']?['totalAmountRupees']
-    );
+    // final num totalAmt = _num(
+    //     financials?['overall']?['totalAmountRupees']
+    // );
+    final num totalAmt =
+    _num(stats?['financials']?['totalAmountRupees']);
+
 
 
     final num paidAmt = _num(

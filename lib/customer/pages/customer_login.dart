@@ -25,6 +25,8 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
   final _phoneCtrl = TextEditingController();
   final _referralCtrl = TextEditingController();
   final _otpCtrl = TextEditingController();
+  String _savedReferralCode = "";
+
 
   bool _sendingOtp = false;
   bool _verifyingOtp = false;
@@ -66,7 +68,13 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       }
     }
 
-    setState(() => _otpSent = true);
+    // setState(() => _otpSent = true);
+
+    setState(() {
+      _otpSent = true;
+      _savedReferralCode = _referralCtrl.text.trim();
+    });
+
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('OTP sent')),
@@ -87,7 +95,10 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
     try {
       final phone = _phoneCtrl.text.trim();
       final name = _nameCtrl.text.trim();
-      final referral = _referralCtrl.text.trim();
+      // final referral = _referralCtrl.text.trim();
+
+      final referral = _savedReferralCode;
+
 
       final res = await CustomerService.verifyOtp(
         phone: phone,
@@ -109,6 +120,27 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       final data = Map<String, dynamic>.from(res['data']);
       final session = Map<String, dynamic>.from(data['session']);
       final customer = Map<String, dynamic>.from(data['customer']);
+
+      // ---------------- REFERRAL CLAIM FIX (NEW CODE) ----------------
+
+      if (referral.isNotEmpty) {
+        try {
+          final claimRes = await CustomerService.claimReferral(
+            customerId: customer['_id'].toString(),
+            referralCode: referral,
+          );
+
+          // Optional logging
+          if (claimRes['statusCode'] != 200) {
+            debugPrint("Referral claim failed: ${claimRes['data']}");
+          }
+
+        } catch (e) {
+          debugPrint("Referral claim exception: $e");
+        }
+      }
+// ---------------------------------------------------------------
+
 
       await LocalStorage.saveSession(session);
       await LocalStorage.saveCustomer(customer);

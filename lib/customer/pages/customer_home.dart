@@ -20,7 +20,6 @@ import '../../core/safe_state.dart';
 import '../../core/date_utils.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
-
 class CustomerHomePage extends StatefulWidget {
   final Map<String, dynamic> customer;
   const CustomerHomePage({Key? key, required this.customer}) : super(key: key);
@@ -61,9 +60,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   Map<String, dynamic>? _pendingPaymentContext;
 
-
   // modify initState to fetch wallet for the card (keep existing calls)
-
 
   @override
   void initState() {
@@ -77,7 +74,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
     _init();
   }
-
 
   Future<void> _init() async {
     if (!_hasSession) {
@@ -171,7 +167,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       return false;
     }
   }
-
 
   bool _needsPayment(Map<String, dynamic> box) {
     final billingStart = box['billingStart'];
@@ -306,12 +301,50 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final useWalletFlag = _useWalletForBox[idStr] == true;
 
     // compute amounts
-    final int walletApply = useWalletFlag
-        ? (walletPaiseAvailable <= amountPaise
-              ? walletPaiseAvailable
-              : amountPaise)
-        : 0;
-    final int netPayPaise = amountPaise - walletApply;
+    // final int walletApply = useWalletFlag
+    //     ? (walletPaiseAvailable <= amountPaise
+    //           ? walletPaiseAvailable
+    //           : amountPaise)
+    //     : 0;
+    // final int netPayPaise = amountPaise - walletApply;
+
+    final orderRes = await ApiConfig.post('/api/payments/create-order', {
+      "boxId": boxId,
+      "period": period,
+    });
+
+    final data = orderRes['body'];
+
+    if (orderRes['statusCode'] != 200) {
+      throw Exception("Failed to create order");
+    }
+
+// 🔥 NEW: Wallet fully covers payment → skip Razorpay
+    if (data['skipRazorpay'] == true) {
+      final apiRes = await ApiConfig.post(
+        '/api/customers/$customerId/boxes/$boxId/activate',
+        {
+          "period": period,
+          "paymentId": null,
+          "orderId": null,
+          "signature": null,
+          "useWallet": true,
+        },
+      );
+
+      if (apiRes['statusCode'] == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment successful (wallet used)')),
+        );
+        await _loadBoxes();
+        await _loadWalletForCard();
+      } else {
+        throw Exception("Activation failed");
+      }
+      return;
+    }
+
+
     String paiseToRupees(int p) => '₹${(p / 100.0).toStringAsFixed(2)}';
 
     // Show confirmation dialog (no checkbox here)
@@ -372,19 +405,26 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         ),
                       ],
                       const Divider(height: 20),
+                      // _rowLabelValue(
+                      //   'Wallet applied',
+                      //   paiseToRupees(walletApply),
+                      // ),
+
                       _rowLabelValue(
-                        'Wallet applied',
-                        paiseToRupees(walletApply),
+                        'Payable',
+                        'Calculated at checkout',
+                        valueStyle: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(height: 8),
-                      _rowLabelValue(
-                        'Net to pay',
-                        paiseToRupees(netPayPaise),
-                        valueStyle: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                        ),
-                      ),
+
+                      // const SizedBox(height: 8),
+                      // _rowLabelValue(
+                      //   'Net to pay',
+                      //   paiseToRupees(netPayPaise),
+                      //   valueStyle: const TextStyle(
+                      //     fontWeight: FontWeight.w800,
+                      //     fontSize: 16,
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),
@@ -452,16 +492,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     //   ).showSnackBar(SnackBar(content: Text('Payment error: $e')));
     // }
 
-
     try {
       // Step 1 – Create Razorpay Order from backend
-      final orderRes = await ApiConfig.post(
-        '/api/payments/create-order',
-        {
-          "boxId": boxId,
-          "period": period
-        },
-      );
+      final orderRes = await ApiConfig.post('/api/payments/create-order', {
+        "boxId": boxId,
+        "period": period,
+      });
 
       final data = orderRes['body'];
 
@@ -470,19 +506,48 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       }
 
       // Step 2 – Open Razorpay UI
+      // var options = {
+      //   'key': data['key'],
+      //   'amount': data['amountPaise'],
+      //   'name': 'CablePay',
+      //   'description': 'Subscription Payment',
+      //   'order_id': data['orderId'],
+      //   'currency': 'INR',
+      //   'prefill': {
+      //     'contact': widget.customer['phone'] ?? ''
+      //   },
+      //   'theme': {
+      //     'color': '#3568B1'
+      //   }
+      // };
+
       var options = {
         'key': data['key'],
         'amount': data['amountPaise'],
+        'currency': 'INR',
         'name': 'CablePay',
         'description': 'Subscription Payment',
         'order_id': data['orderId'],
-        'currency': 'INR',
-        'prefill': {
-          'contact': widget.customer['phone'] ?? ''
+
+        'prefill': {'contact': widget.customer['phone'] ?? ''},
+
+        'theme': {'color': '#3568B1'},
+
+        // ✅ CORRECT WAY TO SHOW ONLY UPI
+        'config': {
+          'display': {
+            'blocks': {
+              'upi': {
+                'name': 'Pay using UPI',
+                'instruments': [
+                  {'method': 'upi'},
+                ],
+              },
+            },
+            'sequence': ['block.upi'],
+            'preferences': {'show_default_blocks': false},
+          },
         },
-        'theme': {
-          'color': '#3568B1'
-        }
       };
 
       // Store context for success callback
@@ -490,21 +555,18 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         "customerId": customerId,
         "boxId": boxId,
         "period": period,
-        "useWallet": useWalletFlag
+        "useWallet": useWalletFlag,
       };
 
       _razorpay.open(options);
-
     } catch (e) {
       if (!mounted) return;
       setState(() => activating[idStr] = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Payment initiation failed: $e"))
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Payment initiation failed: $e")));
     }
-
-
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
@@ -518,7 +580,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         "paymentId": response.paymentId,
         "orderId": response.orderId,
         "signature": response.signature,
-        "useWallet": ctx["useWallet"]
+        "useWallet": ctx["useWallet"],
       };
 
       final apiRes = await ApiConfig.post(
@@ -531,24 +593,23 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       final statusCode = apiRes['statusCode'] as int? ?? 500;
 
       if (statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Payment successful'))
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Payment successful')));
 
         await _loadBoxes();
         await _loadWalletForCard();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Payment verification failed'))
+          const SnackBar(content: Text('Payment verification failed')),
         );
       }
-
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Verification error: $e"))
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Verification error: $e")));
     } finally {
       _pendingPaymentContext = null;
     }
@@ -557,14 +618,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   void _handlePaymentError(PaymentFailureResponse response) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Payment failed or cancelled"))
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text("Payment failed or cancelled")));
 
     _pendingPaymentContext = null;
   }
-
-
 
   // small helper used inside dialog
   Widget _rowLabelValue(String label, String value, {TextStyle? valueStyle}) {
@@ -1094,16 +1153,16 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       //   );
                       // }
 
-                      final rawStatus = (box['status'] ?? '').toString().toLowerCase();
+                      final rawStatus = (box['status'] ?? '')
+                          .toString()
+                          .toLowerCase();
 
                       final isProcessingState =
                           rawStatus == 'pending' ||
-                              rawStatus == 'processing' ||
-                              rawStatus == 'waiting';
+                          rawStatus == 'processing' ||
+                          rawStatus == 'waiting';
 
                       final isPaidThisMonth = _isPaidForCurrentMonth(box);
-
-
 
                       // ---- CASE 1: PAID FOR CURRENT MONTH ----
                       if (isPaidThisMonth) {
@@ -1113,7 +1172,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                           decoration: BoxDecoration(
                             color: Colors.green.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.green.withOpacity(0.2)),
+                            border: Border.all(
+                              color: Colors.green.withOpacity(0.2),
+                            ),
                           ),
                           child: const Center(
                             child: Text(
@@ -1128,7 +1189,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         );
                       }
 
-// ---- CASE 2: PAYMENT DONE BUT BACKEND STILL PROCESSING ----
+                      // ---- CASE 2: PAYMENT DONE BUT BACKEND STILL PROCESSING ----
                       if (isProcessingState) {
                         return Container(
                           width: double.infinity,
@@ -1136,7 +1197,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                           decoration: BoxDecoration(
                             color: Colors.amber.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                            border: Border.all(
+                              color: Colors.amber.withOpacity(0.3),
+                            ),
                           ),
                           child: const Center(
                             child: Text(
@@ -1151,7 +1214,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         );
                       }
 
-// ---- CASE 3: NOT PAID FOR CURRENT MONTH → PAY NOW ----
+                      // ---- CASE 3: NOT PAID FOR CURRENT MONTH → PAY NOW ----
                       return ElevatedButton(
                         onPressed: isProcessing
                             ? null
@@ -1166,22 +1229,21 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         ),
                         child: isProcessing
                             ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.5,
-                          ),
-                        )
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
                             : Text(
-                          'Pay Now • ${_formatWallet(origPaise)}',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                                'Pay Now • ${_formatWallet(origPaise)}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                       );
-
                     })(),
                   ),
                 ],
@@ -1568,7 +1630,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     _razorpay.clear();
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {

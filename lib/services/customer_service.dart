@@ -39,6 +39,22 @@ class CustomerService {
     };
   }
 
+  static Future<Map<String, dynamic>> claimReferral({
+    required String customerId,
+    required String referralCode,
+  }) async {
+    final res = await ApiConfig.post('/api/referral/claim', {
+      'customerId': customerId,
+      'referralCode': referralCode.trim(),
+    });
+
+    return {
+      'statusCode': res['statusCode'],
+      'data': res['body'],
+    };
+  }
+
+
 
   // Get customer by id
   static Future<Map<String, dynamic>> getCustomer(String id) async {

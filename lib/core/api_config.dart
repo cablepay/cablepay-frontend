@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 class ApiConfig {
   // ---------- Settings ----------
   static int port = 3000; // change as needed
-  static String lanIp = '192.168.0.32'; // your physical device / laptop IP
+  static String lanIp = '192.168.0.52'; // your physical device / laptop IP
 
   // optional manual overrides (useful when auto-detect fails)
   static String? _overrideHost;    // e.g. '10.0.2.2:5000' or 'localhost:5000'

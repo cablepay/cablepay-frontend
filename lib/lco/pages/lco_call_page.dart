@@ -2,22 +2,50 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LcoCallPage extends StatelessWidget {
-  /// 🔹 Single fixed number for LCO app
+  /// 🔹 Single fixed number for LCO app (India toll-free)
   static const String lcoSupportPhone = '1800123456';
 
   const LcoCallPage({Key? key}) : super(key: key);
 
-  Future<void> _call(String phone) async {
-    final clean = phone.replaceAll(RegExp(r'\D'), '');
-    if (clean.isEmpty) return;
+  Future<void> _call(BuildContext context, String phone) async {
+    // Preserve +, allow India +91, 10-digit, toll-free
+    final sanitized = phone.replaceAll(RegExp(r'[^\d+]'), '');
 
-    final uri = Uri.parse('tel:$clean');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (sanitized.isEmpty) {
+      _showError(context, 'Invalid phone number');
+      return;
+    }
+
+    final uri = Uri(
+      scheme: 'tel',
+      path: sanitized,
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched) {
+        _showError(context, 'Unable to open phone dialer');
+      }
+    } catch (_) {
+      _showError(context, 'Calling not supported on this device');
     }
   }
 
+  void _showError(BuildContext context, String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.red.shade600,
+      ),
+    );
+  }
+
   Widget _callRow({
+    required BuildContext context, // ✅ FIX
     required String title,
     required String subtitle,
     required String phone,
@@ -73,7 +101,7 @@ class LcoCallPage extends StatelessWidget {
 
           /// RIGHT CALL BUTTON
           InkWell(
-            onTap: () => _call(phone),
+            onTap: () => _call(context, phone),
             borderRadius: BorderRadius.circular(50),
             child: Container(
               padding: const EdgeInsets.all(12),
@@ -123,8 +151,9 @@ class LcoCallPage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            /// 🔹 FIXED LCO SUPPORT NUMBER
+            /// 🔹 FIXED SUPPORT NUMBER
             _callRow(
+              context: context, // ✅ PASS CONTEXT
               title: 'CablePay Support',
               subtitle: 'Central support team',
               phone: lcoSupportPhone,
