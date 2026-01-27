@@ -234,18 +234,357 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     return null;
   }
 
+//   Future<void> _confirmAndPay(Map<String, dynamic> box) async {
+//     if (!_hasSession) return;
+//     final customerId = widget.customer['_id'] ?? widget.customer['id'];
+//     final boxId = (box['_id'] ?? box['id']);
+//     if (customerId == null || boxId == null) {
+//       ScaffoldMessenger.of(
+//         context,
+//       ).showSnackBar(const SnackBar(content: Text('Missing identifiers')));
+//       return;
+//     }
+//
+//     // Refresh local box data (best-effort)
+//     Map<String, dynamic>? freshBox;
+//     try {
+//       final listRes = await CustomerService.listBoxes(customerId.toString());
+//       if (listRes['statusCode'] == 200 && listRes['data'] is List) {
+//         final boxes = List<Map<String, dynamic>>.from(listRes['data'] as List);
+//         freshBox = boxes.firstWhere((b) {
+//           final idA = (b['_id'] ?? b['id']).toString();
+//           final idB = boxId.toString();
+//           return idA == idB;
+//         }, orElse: () => <String, dynamic>{});
+//         if (freshBox.isEmpty) freshBox = null;
+//       }
+//     } catch (_) {
+//       freshBox = null;
+//     }
+//
+//     final useBox = (freshBox != null) ? freshBox : box;
+//     final amountPaise = _amountPaiseForBox(useBox);
+//     if (amountPaise == null || amountPaise <= 0) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(
+//           content: Text('No price configured for this box. Contact your LCO.'),
+//         ),
+//       );
+//       return;
+//     }
+//     final period = DateFormat('yyyy-MM').format(DateTime.now());
+//
+//     // Fetch wallet summary right before payment (to show in dialog)
+//     int walletPaiseAvailable = 0;
+//     DateTime? walletUpdatedAt;
+//     try {
+//       final wres = await CustomerService.getWallet(customerId.toString());
+//       if (wres['statusCode'] == 200 && wres['data'] != null) {
+//         final body = wres['data'] as Map<String, dynamic>;
+//         final raw = body['walletPaise'] ?? 0;
+//         walletPaiseAvailable = (raw is int) ? raw : int.tryParse('$raw') ?? 0;
+//         final tu = body['walletUpdatedAt'];
+//         walletUpdatedAt = tu != null ? DateTime.tryParse(tu.toString()) : null;
+//       }
+//     } catch (_) {
+//       walletPaiseAvailable = 0;
+//     }
+//
+//     // Use per-box toggle (set default if not present)
+//     final idStr = boxId.toString();
+//     if (!_useWalletForBox.containsKey(idStr)) {
+//       final defaultApply = (walletPaiseAvailable > 0)
+//           ? (walletPaiseAvailable <= amountPaise ? true : true)
+//           : false;
+//       _useWalletForBox[idStr] = defaultApply;
+//     }
+//     final useWalletFlag = _useWalletForBox[idStr] == true;
+//
+//     // compute amounts
+//     // final int walletApply = useWalletFlag
+//     //     ? (walletPaiseAvailable <= amountPaise
+//     //           ? walletPaiseAvailable
+//     //           : amountPaise)
+//     //     : 0;
+//     // final int netPayPaise = amountPaise - walletApply;
+//
+//     final orderRes = await ApiConfig.post('/api/payments/create-order', {
+//       "boxId": boxId,
+//       "period": period,
+//     });
+//
+//     final data = orderRes['body'];
+//
+//     if (orderRes['statusCode'] != 200) {
+//       throw Exception("Failed to create order");
+//     }
+//
+// // 🔥 NEW: Wallet fully covers payment → skip Razorpay
+//     if (data['skipRazorpay'] == true) {
+//       final apiRes = await ApiConfig.post(
+//         '/api/customers/$customerId/boxes/$boxId/activate',
+//         {
+//           "period": period,
+//           "paymentId": null,
+//           "orderId": null,
+//           "signature": null,
+//           "useWallet": true,
+//         },
+//       );
+//
+//       if (apiRes['statusCode'] == 200) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(content: Text('Payment successful (wallet used)')),
+//         );
+//         await _loadBoxes();
+//         await _loadWalletForCard();
+//       } else {
+//         throw Exception("Activation failed");
+//       }
+//       return;
+//     }
+//
+//
+//     String paiseToRupees(int p) => '₹${(p / 100.0).toStringAsFixed(2)}';
+//
+//     // Show confirmation dialog (no checkbox here)
+//     final confirmed = await showDialog<bool>(
+//       context: context,
+//       barrierDismissible: false,
+//       builder: (context) {
+//         return AlertDialog(
+//           title: const Text('Confirm Payment'),
+//           content: SingleChildScrollView(
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Text(
+//                   'Box: ${useBox['setupBoxNumber'] ?? '-'}',
+//                   style: const TextStyle(fontWeight: FontWeight.w600),
+//                 ),
+//                 const SizedBox(height: 8),
+//                 Row(
+//                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                   children: [
+//                     Text(
+//                       'Period',
+//                       style: TextStyle(color: Colors.grey.shade700),
+//                     ),
+//                     Text(
+//                       period,
+//                       style: const TextStyle(fontWeight: FontWeight.w600),
+//                     ),
+//                   ],
+//                 ),
+//                 const SizedBox(height: 12),
+//                 Container(
+//                   padding: const EdgeInsets.all(12),
+//                   decoration: BoxDecoration(
+//                     color: Colors.grey.shade50,
+//                     borderRadius: BorderRadius.circular(8),
+//                     border: Border.all(color: Colors.grey.shade200),
+//                   ),
+//                   child: Column(
+//                     crossAxisAlignment: CrossAxisAlignment.start,
+//                     children: [
+//                       _rowLabelValue('Amount', paiseToRupees(amountPaise)),
+//                       const SizedBox(height: 8),
+//                       _rowLabelValue(
+//                         'Wallet balance',
+//                         paiseToRupees(walletPaiseAvailable),
+//                       ),
+//                       if (walletUpdatedAt != null) ...[
+//                         const SizedBox(height: 6),
+//                         Text(
+//                           'Updated ${DateFormat.yMMMd().add_jm().format(walletUpdatedAt!.toLocal())}',
+//                           style: TextStyle(
+//                             color: Colors.grey.shade500,
+//                             fontSize: 12,
+//                           ),
+//                         ),
+//                       ],
+//                       const Divider(height: 20),
+//                       // _rowLabelValue(
+//                       //   'Wallet applied',
+//                       //   paiseToRupees(walletApply),
+//                       // ),
+//
+//                       _rowLabelValue(
+//                         'Payable',
+//                         'Calculated at checkout',
+//                         valueStyle: const TextStyle(fontWeight: FontWeight.w700),
+//                       ),
+//
+//                       // const SizedBox(height: 8),
+//                       // _rowLabelValue(
+//                       //   'Net to pay',
+//                       //   paiseToRupees(netPayPaise),
+//                       //   valueStyle: const TextStyle(
+//                       //     fontWeight: FontWeight.w800,
+//                       //     fontSize: 16,
+//                       //   ),
+//                       // ),
+//                     ],
+//                   ),
+//                 ),
+//                 const SizedBox(height: 12),
+//                 Text(
+//                   'Note: wallet credits are applied at checkout. If server does not support disabling the wallet, it may still be consumed.',
+//                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+//                 ),
+//               ],
+//             ),
+//           ),
+//           actions: [
+//             TextButton(
+//               onPressed: () => Navigator.of(context).pop(false),
+//               child: const Text('Cancel'),
+//             ),
+//             ElevatedButton(
+//               onPressed: () => Navigator.of(context).pop(true),
+//               child: const Text('Confirm & Pay'),
+//             ),
+//           ],
+//         );
+//       },
+//     );
+//
+//     if (confirmed != true) return;
+//
+//     if (!mounted) return;
+//     setState(() => activating[idStr] = true);
+//
+//     // try {
+//     //   final payload = <String, dynamic>{
+//     //     'period': period,
+//     //     'useWallet': useWalletFlag,
+//     //   };
+//     //   final apiRes = await ApiConfig.post(
+//     //     '/api/customers/$customerId/boxes/$boxId/activate',
+//     //     payload,
+//     //   );
+//     //
+//     //   setState(() => activating[idStr] = false);
+//     //
+//     //   final statusCode = apiRes['statusCode'] as int? ?? 500;
+//     //   final data = apiRes['body'];
+//     //
+//     //   if (statusCode == 200) {
+//     //     ScaffoldMessenger.of(context).showSnackBar(
+//     //       const SnackBar(content: Text('Payment succeeded — box activated')),
+//     //     );
+//     //     await _loadBoxes();
+//     //     await _loadWalletForCard(); // refresh wallet after payment
+//     //   } else {
+//     //     final msg = (data is Map && data['error'] != null)
+//     //         ? data['error'].toString()
+//     //         : 'Payment failed';
+//     //     ScaffoldMessenger.of(
+//     //       context,
+//     //     ).showSnackBar(SnackBar(content: Text(msg)));
+//     //   }
+//     // } catch (e) {
+//     //   if (!mounted) return;
+//     //   setState(() => activating[idStr] = false);
+//     //   ScaffoldMessenger.of(
+//     //     context,
+//     //   ).showSnackBar(SnackBar(content: Text('Payment error: $e')));
+//     // }
+//
+//     try {
+//       // Step 1 – Create Razorpay Order from backend
+//       final orderRes = await ApiConfig.post('/api/payments/create-order', {
+//         "boxId": boxId,
+//         "period": period,
+//       });
+//
+//       final data = orderRes['body'];
+//
+//       if (orderRes['statusCode'] != 200) {
+//         throw Exception("Failed to create order");
+//       }
+//
+//       // Step 2 – Open Razorpay UI
+//       // var options = {
+//       //   'key': data['key'],
+//       //   'amount': data['amountPaise'],
+//       //   'name': 'CablePay',
+//       //   'description': 'Subscription Payment',
+//       //   'order_id': data['orderId'],
+//       //   'currency': 'INR',
+//       //   'prefill': {
+//       //     'contact': widget.customer['phone'] ?? ''
+//       //   },
+//       //   'theme': {
+//       //     'color': '#3568B1'
+//       //   }
+//       // };
+//
+//       var options = {
+//         'key': data['key'],
+//         'amount': data['amountPaise'],
+//         'currency': 'INR',
+//         'name': 'CablePay',
+//         'description': 'Subscription Payment',
+//         'order_id': data['orderId'],
+//
+//         'prefill': {'contact': widget.customer['phone'] ?? ''},
+//
+//         'theme': {'color': '#3568B1'},
+//
+//         // ✅ CORRECT WAY TO SHOW ONLY UPI
+//         'config': {
+//           'display': {
+//             'blocks': {
+//               'upi': {
+//                 'name': 'Pay using UPI',
+//                 'instruments': [
+//                   {'method': 'upi'},
+//                 ],
+//               },
+//             },
+//             'sequence': ['block.upi'],
+//             'preferences': {'show_default_blocks': false},
+//           },
+//         },
+//       };
+//
+//       // Store context for success callback
+//       _pendingPaymentContext = {
+//         "customerId": customerId,
+//         "boxId": boxId,
+//         "period": period,
+//         "useWallet": useWalletFlag,
+//       };
+//
+//       _razorpay.open(options);
+//     } catch (e) {
+//       if (!mounted) return;
+//       setState(() => activating[idStr] = false);
+//
+//       ScaffoldMessenger.of(
+//         context,
+//       ).showSnackBar(SnackBar(content: Text("Payment initiation failed: $e")));
+//     }
+//   }
+
+
   Future<void> _confirmAndPay(Map<String, dynamic> box) async {
     if (!_hasSession) return;
+
+    // 1. Validate Identifiers
     final customerId = widget.customer['_id'] ?? widget.customer['id'];
     final boxId = (box['_id'] ?? box['id']);
+
     if (customerId == null || boxId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Missing identifiers')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Missing identifiers')),
+      );
       return;
     }
 
-    // Refresh local box data (best-effort)
+    // 2. Refresh local box data (Logic kept as is)
     Map<String, dynamic>? freshBox;
     try {
       final listRes = await CustomerService.listBoxes(customerId.toString());
@@ -264,25 +603,24 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
     final useBox = (freshBox != null) ? freshBox : box;
     final amountPaise = _amountPaiseForBox(useBox);
+
     if (amountPaise == null || amountPaise <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No price configured for this box. Contact your LCO.'),
-        ),
+        const SnackBar(content: Text('No price configured. Contact LCO.')),
       );
       return;
     }
+
     final period = DateFormat('yyyy-MM').format(DateTime.now());
 
-    // Fetch wallet summary right before payment (to show in dialog)
+    // 3. Fetch Wallet Summary
     int walletPaiseAvailable = 0;
     DateTime? walletUpdatedAt;
     try {
       final wres = await CustomerService.getWallet(customerId.toString());
       if (wres['statusCode'] == 200 && wres['data'] != null) {
         final body = wres['data'] as Map<String, dynamic>;
-        final raw = body['walletPaise'] ?? 0;
-        walletPaiseAvailable = (raw is int) ? raw : int.tryParse('$raw') ?? 0;
+        walletPaiseAvailable = int.tryParse('${body['walletPaise']}') ?? 0;
         final tu = body['walletUpdatedAt'];
         walletUpdatedAt = tu != null ? DateTime.tryParse(tu.toString()) : null;
       }
@@ -290,235 +628,136 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       walletPaiseAvailable = 0;
     }
 
-    // Use per-box toggle (set default if not present)
-    final idStr = boxId.toString();
-    if (!_useWalletForBox.containsKey(idStr)) {
-      final defaultApply = (walletPaiseAvailable > 0)
-          ? (walletPaiseAvailable <= amountPaise ? true : true)
-          : false;
-      _useWalletForBox[idStr] = defaultApply;
-    }
-    final useWalletFlag = _useWalletForBox[idStr] == true;
-
-    // compute amounts
-    // final int walletApply = useWalletFlag
-    //     ? (walletPaiseAvailable <= amountPaise
-    //           ? walletPaiseAvailable
-    //           : amountPaise)
-    //     : 0;
-    // final int netPayPaise = amountPaise - walletApply;
-
-    final orderRes = await ApiConfig.post('/api/payments/create-order', {
-      "boxId": boxId,
-      "period": period,
-    });
-
-    final data = orderRes['body'];
-
-    if (orderRes['statusCode'] != 200) {
-      throw Exception("Failed to create order");
-    }
-
-// 🔥 NEW: Wallet fully covers payment → skip Razorpay
-    if (data['skipRazorpay'] == true) {
-      final apiRes = await ApiConfig.post(
-        '/api/customers/$customerId/boxes/$boxId/activate',
-        {
-          "period": period,
-          "paymentId": null,
-          "orderId": null,
-          "signature": null,
-          "useWallet": true,
-        },
-      );
-
-      if (apiRes['statusCode'] == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment successful (wallet used)')),
-        );
-        await _loadBoxes();
-        await _loadWalletForCard();
-      } else {
-        throw Exception("Activation failed");
-      }
-      return;
-    }
-
-
     String paiseToRupees(int p) => '₹${(p / 100.0).toStringAsFixed(2)}';
 
-    // Show confirmation dialog (no checkbox here)
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Confirm Payment'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Box: ${useBox['setupBoxNumber'] ?? '-'}',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Period',
-                      style: TextStyle(color: Colors.grey.shade700),
-                    ),
-                    Text(
-                      period,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _rowLabelValue('Amount', paiseToRupees(amountPaise)),
-                      const SizedBox(height: 8),
-                      _rowLabelValue(
-                        'Wallet balance',
-                        paiseToRupees(walletPaiseAvailable),
-                      ),
-                      if (walletUpdatedAt != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          'Updated ${DateFormat.yMMMd().add_jm().format(walletUpdatedAt!.toLocal())}',
-                          style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                      const Divider(height: 20),
-                      // _rowLabelValue(
-                      //   'Wallet applied',
-                      //   paiseToRupees(walletApply),
-                      // ),
-
-                      _rowLabelValue(
-                        'Payable',
-                        'Calculated at checkout',
-                        valueStyle: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-
-                      // const SizedBox(height: 8),
-                      // _rowLabelValue(
-                      //   'Net to pay',
-                      //   paiseToRupees(netPayPaise),
-                      //   valueStyle: const TextStyle(
-                      //     fontWeight: FontWeight.w800,
-                      //     fontSize: 16,
-                      //   ),
-                      // ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Note: wallet credits are applied at checkout. If server does not support disabling the wallet, it may still be consumed.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Confirm & Pay'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true) return;
+    // 4. Show Confirmation Dialog FIRST (Don't create order yet)
+    // final confirmed = await showDialog<bool>(
+    //   context: context,
+    //   barrierDismissible: false,
+    //   builder: (context) {
+    //     return AlertDialog(
+    //       title: const Text('Confirm Payment'),
+    //       content: SingleChildScrollView(
+    //         child: Column(
+    //           mainAxisSize: MainAxisSize.min,
+    //           crossAxisAlignment: CrossAxisAlignment.start,
+    //           children: [
+    //             Text('Box: ${useBox['setupBoxNumber'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.w600)),
+    //             const SizedBox(height: 8),
+    //             Row(
+    //               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    //               children: [
+    //                 Text('Period', style: TextStyle(color: Colors.grey.shade700)),
+    //                 Text(period, style: const TextStyle(fontWeight: FontWeight.w600)),
+    //               ],
+    //             ),
+    //             const SizedBox(height: 12),
+    //             Container(
+    //               padding: const EdgeInsets.all(12),
+    //               decoration: BoxDecoration(
+    //                 color: Colors.grey.shade50,
+    //                 borderRadius: BorderRadius.circular(8),
+    //                 border: Border.all(color: Colors.grey.shade200),
+    //               ),
+    //               child: Column(
+    //                 crossAxisAlignment: CrossAxisAlignment.start,
+    //                 children: [
+    //                   _rowLabelValue('Amount', paiseToRupees(amountPaise)),
+    //                   const SizedBox(height: 8),
+    //                   _rowLabelValue('Wallet balance', paiseToRupees(walletPaiseAvailable)),
+    //                   if (walletUpdatedAt != null) ...[
+    //                     const SizedBox(height: 6),
+    //                     Text(
+    //                       'Updated ${DateFormat.yMMMd().add_jm().format(walletUpdatedAt!.toLocal())}',
+    //                       style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+    //                     ),
+    //                   ],
+    //                   const Divider(height: 20),
+    //                   _rowLabelValue(
+    //                     'Payable',
+    //                     'Calculated at checkout',
+    //                     valueStyle: const TextStyle(fontWeight: FontWeight.w700),
+    //                   ),
+    //                 ],
+    //               ),
+    //             ),
+    //           ],
+    //         ),
+    //       ),
+    //       actions: [
+    //         TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+    //         ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Confirm & Pay')),
+    //       ],
+    //     );
+    //   },
+    // );
+    //
+    // if (confirmed != true) return;
 
     if (!mounted) return;
+    final idStr = boxId.toString();
     setState(() => activating[idStr] = true);
 
-    // try {
-    //   final payload = <String, dynamic>{
-    //     'period': period,
-    //     'useWallet': useWalletFlag,
-    //   };
-    //   final apiRes = await ApiConfig.post(
-    //     '/api/customers/$customerId/boxes/$boxId/activate',
-    //     payload,
-    //   );
-    //
-    //   setState(() => activating[idStr] = false);
-    //
-    //   final statusCode = apiRes['statusCode'] as int? ?? 500;
-    //   final data = apiRes['body'];
-    //
-    //   if (statusCode == 200) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       const SnackBar(content: Text('Payment succeeded — box activated')),
-    //     );
-    //     await _loadBoxes();
-    //     await _loadWalletForCard(); // refresh wallet after payment
-    //   } else {
-    //     final msg = (data is Map && data['error'] != null)
-    //         ? data['error'].toString()
-    //         : 'Payment failed';
-    //     ScaffoldMessenger.of(
-    //       context,
-    //     ).showSnackBar(SnackBar(content: Text(msg)));
-    //   }
-    // } catch (e) {
-    //   if (!mounted) return;
-    //   setState(() => activating[idStr] = false);
-    //   ScaffoldMessenger.of(
-    //     context,
-    //   ).showSnackBar(SnackBar(content: Text('Payment error: $e')));
-    // }
-
     try {
-      // Step 1 – Create Razorpay Order from backend
+      // 5. Create Order (ONLY ONCE)
       final orderRes = await ApiConfig.post('/api/payments/create-order', {
         "boxId": boxId,
         "period": period,
+        "useWallet": _useWalletForBox[idStr] == true,
       });
+
 
       final data = orderRes['body'];
 
       if (orderRes['statusCode'] != 200) {
-        throw Exception("Failed to create order");
+        throw Exception(data['error'] ?? "Failed to create order");
       }
 
-      // Step 2 – Open Razorpay UI
+      // 6. Check if Wallet fully covers payment (Backend Logic)
+      if (data['skipRazorpay'] == true) {
+        // Direct activation logic
+        setState(() => activating[idStr] = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment successful (wallet used)')),
+        );
+
+        await _loadBoxes();
+        await _loadWalletForCard();
+        return;
+
+
+        // setState(() => activating[idStr] = false);
+        //
+        // if (apiRes['statusCode'] == 200) {
+        //   ScaffoldMessenger.of(context).showSnackBar(
+        //     const SnackBar(content: Text('Payment successful (wallet used)')),
+        //   );
+        //   await _loadBoxes();
+        //   await _loadWalletForCard();
+        // } else {
+        //   throw Exception("Activation failed");
+        // }
+        // return;
+      }
+
+
+
       // var options = {
       //   'key': data['key'],
       //   'amount': data['amountPaise'],
+      //   'currency': 'INR',
       //   'name': 'CablePay',
       //   'description': 'Subscription Payment',
       //   'order_id': data['orderId'],
-      //   'currency': 'INR',
+      //
       //   'prefill': {
-      //     'contact': widget.customer['phone'] ?? ''
+      //     'contact': widget.customer['phone'] ?? '',
       //   },
+      //
       //   'theme': {
-      //     'color': '#3568B1'
-      //   }
+      //     'color': '#3568B1',
+      //   },
       // };
 
       var options = {
@@ -528,44 +767,63 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         'name': 'CablePay',
         'description': 'Subscription Payment',
         'order_id': data['orderId'],
-
-        'prefill': {'contact': widget.customer['phone'] ?? ''},
-
-        'theme': {'color': '#3568B1'},
-
-        // ✅ CORRECT WAY TO SHOW ONLY UPI
+        'prefill': {
+          'contact': widget.customer['phone'] ?? '',
+        },
+        'theme': {
+          'color': '#3568B1',
+        },
         'config': {
           'display': {
             'blocks': {
-              'upi': {
-                'name': 'Pay using UPI',
+              'upi_intent': {
+                'name': 'Pay using App',
                 'instruments': [
-                  {'method': 'upi'},
+                  {
+                    'method': 'upi',
+                    'flows': ['intent'],
+                  },
+                ],
+              },
+              'upi_collect': {
+                'name': 'Pay via UPI ID',
+                'instruments': [
+                  {
+                    'method': 'upi',
+                    'flows': ['collect'],
+                  },
                 ],
               },
             },
-            'sequence': ['block.upi'],
-            'preferences': {'show_default_blocks': false},
+            'sequence': [
+              'block.upi_intent',
+              'block.upi_collect',
+            ],
+            'preferences': {
+              'show_default_blocks': false,
+            },
           },
         },
       };
 
-      // Store context for success callback
+
+
       _pendingPaymentContext = {
         "customerId": customerId,
         "boxId": boxId,
         "period": period,
-        "useWallet": useWalletFlag,
+        "useWallet": _useWalletForBox[idStr] == true,
       };
 
+
       _razorpay.open(options);
+
     } catch (e) {
       if (!mounted) return;
       setState(() => activating[idStr] = false);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Payment initiation failed: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
     }
   }
 
@@ -583,6 +841,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         "useWallet": ctx["useWallet"],
       };
 
+      // final apiRes = await ApiConfig.post(
+      //   '/api/customers/${ctx["customerId"]}/boxes/${ctx["boxId"]}/activate',
+      //   payload,
+      // );
+      //
+      // if (!mounted) return;
+      //
+      // final statusCode = apiRes['statusCode'] as int? ?? 500;
+
       final apiRes = await ApiConfig.post(
         '/api/customers/${ctx["customerId"]}/boxes/${ctx["boxId"]}/activate',
         payload,
@@ -591,6 +858,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       if (!mounted) return;
 
       final statusCode = apiRes['statusCode'] as int? ?? 500;
+
 
       if (statusCode == 200) {
         ScaffoldMessenger.of(
@@ -611,19 +879,39 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         context,
       ).showSnackBar(SnackBar(content: Text("Verification error: $e")));
     } finally {
+      if (ctx != null) {
+        final boxId = ctx["boxId"]?.toString();
+        if (boxId != null && mounted) {
+          setState(() {
+            activating[boxId] = false; // 🔥 ENSURE RESET
+          });
+        }
+      }
       _pendingPaymentContext = null;
     }
+
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text("Payment failed or cancelled")));
+    final ctx = _pendingPaymentContext;
+    if (ctx != null) {
+      final boxId = ctx["boxId"]?.toString();
+      if (boxId != null) {
+        setState(() {
+          activating[boxId] = false; // 🔥 FIX
+        });
+      }
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Payment cancelled")),
+    );
 
     _pendingPaymentContext = null;
   }
+
 
   // small helper used inside dialog
   Widget _rowLabelValue(String label, String value, {TextStyle? valueStyle}) {
@@ -1042,10 +1330,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               final walletApplicable = (walletAvailable > 0) && (origPaise > 0);
 
               // ensure we have an entry for this box in the map (checkbox state)
+              // if (!_useWalletForBox.containsKey(idStr)) {
+              //   // default behaviour: apply wallet if available
+              //   _useWalletForBox[idStr] = walletApplicable;
+              // }
+
               if (!_useWalletForBox.containsKey(idStr)) {
-                // default behaviour: apply wallet if available
-                _useWalletForBox[idStr] = walletApplicable;
+                _useWalletForBox[idStr] = false;
               }
+
 
               final useWallet = _useWalletForBox[idStr] == true;
 

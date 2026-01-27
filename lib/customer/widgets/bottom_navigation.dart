@@ -1,6 +1,7 @@
 // lib/widgets/bottom_navigation.dart
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
+import '../../services/customer_service.dart';
 import '../pages/call_page.dart';
 import '../pages/chat_page.dart';
 import '../pages/customer_history.dart';
@@ -30,6 +31,8 @@ class AppBottomNavigation extends StatefulWidget {
 class _AppBottomNavigationState extends State<AppBottomNavigation> {
   // 0: Home, 1: History, 2: Call (center), 3: Referral, 4: Chat
   late int _currentIndex;
+  String? _selectedBoxId;
+  bool _loadingBox = true;
 
   @override
   void initState() {
@@ -37,6 +40,21 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
     // clamp to valid range [0..4]
     final idx = widget.initialIndex;
     _currentIndex = (idx < 0) ? 0 : (idx > 4 ? 4 : idx);
+    _loadDefaultBox();
+  }
+
+  Future<void> _loadDefaultBox() async {
+    final customerId = widget.customer['_id'] ?? widget.customer['id'];
+    final res = await CustomerService.listBoxes(customerId.toString());
+
+    final boxes = (res['data'] as List?) ?? [];
+    if (boxes.isNotEmpty) {
+      _selectedBoxId = boxes.first['_id'];
+    }
+
+    if (mounted) {
+      setState(() => _loadingBox = false);
+    }
   }
 
   void _setIndex(int i) {
@@ -51,17 +69,25 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
     // Responsive scale: keep behavior identical to your original but avoid
     // extremely small results by clamping sensibly.
     final screenWidth = MediaQuery.of(context).size.width;
-    final scale = (screenWidth < 360) ? (screenWidth / 360).clamp(0.78, 1.0) : 1.0;
+    final scale = (screenWidth < 360)
+        ? (screenWidth / 360).clamp(0.78, 1.0)
+        : 1.0;
 
     final itemIconSize = 40.0 * scale;
     final callSize = 56.0 * scale; // call button diameter
+
+    if (_loadingBox || _selectedBoxId == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     final pages = <Widget>[
       CustomerHomePage(customer: customer),
       CustomerHistoryPage(customer: customer, boxId: null),
       CallPage(customerId: customerId),
       ReferralPage(customer: customer),
-      ChatPage(customer: customer),
+      ChatPage(customer: customer, boxId: _selectedBoxId!),
     ];
 
     // The nav widget itself (keeps exact layout, call button lifted half-out)
@@ -80,7 +106,10 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
                 bottom: 0,
                 child: Container(
                   color: Colors.transparent,
-                  padding: EdgeInsets.symmetric(horizontal: 8.0 * scale, vertical: 6.0 * scale),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 8.0 * scale,
+                    vertical: 6.0 * scale,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -145,7 +174,9 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF34A853).withOpacity(0.28),
+                                color: const Color(
+                                  0xFF34A853,
+                                ).withOpacity(0.28),
                                 blurRadius: 10 * scale,
                                 offset: Offset(0, 6 * scale),
                               ),
@@ -160,7 +191,11 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
                         const SizedBox(height: 6),
                         Text(
                           'Call',
-                          style: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w600, color: Colors.black87),
+                          style: TextStyle(
+                            fontSize: 12 * scale,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
                         ),
                       ],
                     ),
@@ -173,16 +208,15 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
       );
     }
 
+
+
     // Body area that swaps while keeping state
     final body = IndexedStack(index: _currentIndex, children: pages);
 
     // If embedInScaffold is true we return a full scaffold (recommended),
     // otherwise we return a Column suitable to place inside an outer Scaffold.
     if (widget.embedInScaffold) {
-      return Scaffold(
-        body: body,
-        bottomNavigationBar: navBar(),
-      );
+      return Scaffold(body: body, bottomNavigationBar: navBar());
     }
 
     // embedded variant: expands to available height and places nav fixed bottom
@@ -230,10 +264,18 @@ class _SimpleNavItem extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: AppTheme.onPrimary,
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: Offset(0, 3)),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 6,
+                    offset: Offset(0, 3),
+                  ),
                 ],
               ),
-              child: Icon(icon, size: (size * 0.50).clamp(16.0, 22.0), color: iconColor),
+              child: Icon(
+                icon,
+                size: (size * 0.50).clamp(16.0, 22.0),
+                color: iconColor,
+              ),
             ),
             SizedBox(height: 6),
             Text(

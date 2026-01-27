@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../core/app_theme.dart';
+import '../../services/support_service.dart';
 
 class ChatPage extends StatefulWidget {
   final Map<String, dynamic> customer;
+  final String boxId;
 
-  const ChatPage({
-    Key? key,
-    required this.customer,
-  }) : super(key: key);
+  const ChatPage({super.key, required this.customer, required this.boxId});
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -16,183 +17,370 @@ class _ChatPageState extends State<ChatPage> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  /// Local-only messages (UI only, no backend)
-  final List<_ChatMessage> _messages = [
-    _ChatMessage(text: 'Hello! How can I help you?', isMe: false),
-  ];
+  List<dynamic> _questions = [];
+  List<dynamic> _messages = [];
+  Map<String, dynamic>? _activeTicket;
+  bool _loading = true;
 
-  void _sendMessage() {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
+  @override
+  void initState() {
+    super.initState();
+    _initSupport();
+  }
 
-    setState(() {
-      _messages.add(_ChatMessage(text: text, isMe: true));
-      _controller.clear();
-    });
-
-    // Auto-scroll to bottom
-    Future.delayed(const Duration(milliseconds: 100), () {
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  Future<void> _initSupport() async {
+    setState(() => _loading = true);
+    final tickets = await SupportService.customerTickets();
+    final active = tickets.cast<Map<String, dynamic>?>().firstWhere(
+      (t) => t != null && t['status'] != 'closed',
+      orElse: () => null,
+    );
+
+    if (active != null) {
+      final msgs = await SupportService.ticketMessages(active['_id']);
+      if (!mounted) return;
+      setState(() {
+        _activeTicket = active;
+        _messages = msgs;
+        _loading = false;
+      });
+      _scrollToBottom();
+      return;
+    }
+
+    final q = await SupportService.listQuestions();
+    if (!mounted) return;
+    setState(() {
+      _questions = q;
+      _loading = false;
+    });
+
+    if (active == null) {
+      final q = await SupportService.listQuestions();
+      if (!mounted) return;
+      setState(() {
+        _questions = q;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _sendInitialQuestion(String questionId) async {
+    setState(() => _loading = true);
+    final ticket = await SupportService.createTicket(
+      boxId: widget.boxId,
+      questionId: questionId,
+    );
+    final msgs = await SupportService.ticketMessages(ticket['_id']);
+    if (!mounted) return;
+    setState(() {
+      _activeTicket = ticket;
+      _messages = msgs;
+      _questions = [];
+      _loading = false;
+    });
+    _scrollToBottom();
+  }
+
+  Future<void> _sendFollowUp() async {
+    if (_controller.text.trim().isEmpty || _activeTicket == null) return;
+
+    final message = _controller.text.trim();
+    _controller.clear();
+
+    await SupportService.customerReply(
+      ticketId: _activeTicket!['_id'],
+      message: message,
+    );
+
+    // 🔁 Always re-fetch ticket + messages
+    final tickets = await SupportService.customerTickets();
+    final updated = tickets.firstWhere(
+      (t) => t['_id'] == _activeTicket!['_id'],
+      orElse: () => null,
+    );
+
+    final msgs = await SupportService.ticketMessages(_activeTicket!['_id']);
+
+    if (!mounted) return;
+    setState(() {
+      _activeTicket = updated;
+      _messages = msgs;
+    });
+
+    _scrollToBottom();
   }
 
   @override
   Widget build(BuildContext context) {
-    final name = widget.customer['name'] ?? 'Customer';
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: const Color(0xFFF5F7F9),
       appBar: AppBar(
-        title: Text('Chat — $name'),
+        title: const Text(
+          'Help & Support',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        elevation: 0,
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          /// CHAT MESSAGES
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                return _MessageBubble(message: msg);
-              },
-            ),
-          ),
-
-          /// INPUT BAR
-          SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
-                      decoration: InputDecoration(
-                        hintText: 'Type a message…',
-                        filled: true,
-                        fillColor: const Color(0xFFF1F3F6),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Expanded(
+                  child: _messages.isEmpty
+                      ? _EmptySupportState(
+                          questions: _questions,
+                          onSelect: _sendInitialQuestion,
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 20,
+                          ),
+                          itemCount: _messages.length,
+                          itemBuilder: (_, i) => _ChatBubble(
+                            message: _messages[i],
+                            isCustomer:
+                                _messages[i]['senderType'] == 'customer',
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _sendMessage,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF1B4683),
-                      ),
-                      child: const Icon(
-                        Icons.send,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
+                _buildInputArea(),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildInputArea() {
+    if (_activeTicket == null) return const SizedBox.shrink();
+
+    final status = _activeTicket!['status'];
+    final canReply = _activeTicket!['customerCanReply'] == true;
+
+    // 🔒 Ticket resolved → read-only
+    if (status == 'resolved') {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        color: Colors.white,
+        child: Column(
+          children: [
+            Text(
+              'This ticket is resolved.',
+              style: TextStyle(
+                color: Colors.green.shade700,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'If the issue continues, please raise a new ticket.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _activeTicket = null;
+                  _messages = [];
+                });
+              },
+              child: const Text('Raise New Ticket'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ⏳ Waiting for LCO
+    if (!canReply) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        child: Text(
+          "Waiting for operator response...",
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.orange.shade700, fontSize: 12),
+        ),
+      );
+    }
+
+    // ✅ Allowed to reply (rare case)
+    return _replyInput();
+  }
+
+  Widget _replyInput() {
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom + 10,
+        left: 16,
+        right: 16,
+        top: 10,
+      ),
+      color: Colors.white,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              decoration: const InputDecoration(
+                hintText: 'Reply to operator...',
+                border: OutlineInputBorder(),
               ),
             ),
           ),
+          IconButton(icon: const Icon(Icons.send), onPressed: _sendFollowUp),
         ],
       ),
     );
   }
 }
 
-/// ─────────────────────────────────────────────
-/// Message bubble (internal UI-only model)
-/// ─────────────────────────────────────────────
+class _ChatBubble extends StatelessWidget {
+  final dynamic message;
+  final bool isCustomer;
 
-class _ChatMessage {
-  final String text;
-  final bool isMe;
-
-  _ChatMessage({
-    required this.text,
-    required this.isMe,
-  });
-}
-
-class _MessageBubble extends StatelessWidget {
-  final _ChatMessage message;
-
-  const _MessageBubble({
-    Key? key,
-    required this.message,
-  }) : super(key: key);
+  const _ChatBubble({required this.message, required this.isCustomer});
 
   @override
   Widget build(BuildContext context) {
-    final isMe = message.isMe;
+    // final time = DateFormat('hh:mm a').format(DateTime.parse(message['createdAt']));
+    final time = DateFormat(
+      'hh:mm a',
+    ).format(DateTime.parse(message['createdAt']).toLocal());
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
+    return Align(
+      alignment: isCustomer ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(14),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: isCustomer ? AppTheme.primary : Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isCustomer ? 16 : 0),
+            bottomRight: Radius.circular(isCustomer ? 0 : 16),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isMe ? const Color(0xFF1B4683) : Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(14),
-                topRight: const Radius.circular(14),
-                bottomLeft: Radius.circular(isMe ? 14 : 2),
-                bottomRight: Radius.circular(isMe ? 2 : 14),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Text(
-              message.text,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              message['message'],
               style: TextStyle(
-                color: isMe ? Colors.white : Colors.black87,
-                fontSize: 14,
-                height: 1.35,
+                color: isCustomer ? Colors.white : Colors.black87,
+                fontSize: 15,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              time,
+              style: TextStyle(
+                color: isCustomer ? Colors.white70 : Colors.black45,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptySupportState extends StatelessWidget {
+  final List<dynamic> questions;
+  final Function(String) onSelect;
+  const _EmptySupportState({required this.questions, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          const SizedBox(height: 40),
+          Icon(
+            Icons.support_agent_rounded,
+            size: 80,
+            color: AppTheme.primary.withOpacity(0.2),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'How can we help you?',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Choose a common issue to start a ticket',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 32),
+          ...questions.map(
+            (q) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black87,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 16,
+                    horizontal: 20,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                ),
+                onPressed: () => onSelect(q['_id']),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.help_outline,
+                      size: 20,
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        q['title'],
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: Colors.grey,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
