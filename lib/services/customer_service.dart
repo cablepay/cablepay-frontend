@@ -7,9 +7,21 @@ import '../core/api_config.dart';
 
 class CustomerService {
 
-  static Future<Map<String, dynamic>> requestOtp(String phone) async {
+  // static Future<Map<String, dynamic>> requestOtp(String phone) async {
+  //   final res = await ApiConfig.post('/api/auth/request-otp', {
+  //     'phone': phone.trim(),
+  //   });
+  //
+  //   return {
+  //     'statusCode': res['statusCode'],
+  //     'data': res['body'],
+  //   };
+  // }
+
+  static Future<Map<String, dynamic>> requestOtp(String phone, {String? name}) async {
     final res = await ApiConfig.post('/api/auth/request-otp', {
       'phone': phone.trim(),
+      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
     });
 
     return {
@@ -17,6 +29,7 @@ class CustomerService {
       'data': res['body'],
     };
   }
+
 
   /// STEP 2: Verify OTP + Login/Create Customer
   static Future<Map<String, dynamic>> verifyOtp({

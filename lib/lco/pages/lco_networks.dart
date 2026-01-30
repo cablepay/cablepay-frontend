@@ -40,13 +40,26 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
         isExisting: true,
         networkNameCtrl: TextEditingController(text: m['networkName'] ?? ''),
         lcoIdCtrl: TextEditingController(text: m['lcoId'] ?? ''),
-        userNameCtrl: TextEditingController(), // start empty
-        passwordCtrl: TextEditingController(), // start empty
+        // userNameCtrl: TextEditingController(), // start empty
+        // passwordCtrl: TextEditingController(), // start empty
+        // userNameCtrl: TextEditingController(
+        //   text: m['userName'] != null ? _NetworkRow.maskedValue : '',
+        // ),
+        // passwordCtrl: TextEditingController(
+        //   text: m['password'] != null ? _NetworkRow.maskedValue : '',
+        // ),
+        userNameCtrl: TextEditingController(
+          text: _NetworkRow.maskedValue,
+        ),
+        passwordCtrl: TextEditingController(
+          text: _NetworkRow.maskedValue,
+        ),
         websiteCtrl: TextEditingController(text: m['website'] ?? ''),
         fixedPriceCtrl: TextEditingController(
           text: m['fixedPrice']?.toString() ?? '',
         ),
       );
+
     }).toList();
 
     if (_rows.isEmpty) _rows.add(_NetworkRow.empty());
@@ -82,16 +95,28 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
     });
   }
 
-  bool _hasDuplicateLcoIds(List<Map<String, dynamic>> networks) {
+  // bool _hasDuplicateLcoIds(List<Map<String, dynamic>> networks) {
+  //   final seen = <String>{};
+  //   for (final n in networks) {
+  //     final id = (n['lcoId'] ?? '').toString().trim();
+  //     if (id.isEmpty) continue;
+  //     if (seen.contains(id)) return true;
+  //     seen.add(id);
+  //   }
+  //   return false;
+  // }
+
+  String? _findDuplicateLcoId(List<Map<String, dynamic>> networks) {
     final seen = <String>{};
     for (final n in networks) {
       final id = (n['lcoId'] ?? '').toString().trim();
       if (id.isEmpty) continue;
-      if (seen.contains(id)) return true;
+      if (seen.contains(id)) return id;
       seen.add(id);
     }
-    return false;
+    return null;
   }
+
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -132,6 +157,19 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
       ).showSnackBar(const SnackBar(content: Text('Add at least one network')));
       return;
     }
+
+    final duplicateId = _findDuplicateLcoId(networks);
+    if (duplicateId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Network ID "$duplicateId" is already used. Each network must have a unique Network ID.',
+          ),
+        ),
+      );
+      return;
+    }
+
 
     setState(() => _submitting = true);
 
@@ -351,106 +389,52 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                               // --- USER NAME FIELD ---
                               TextFormField(
                                 controller: r.userNameCtrl,
-                                obscureText: !r.isUserNameVisible,
+                                readOnly: r.isExisting && !r.isUserNameVisible,
+                                obscureText: false, // IMPORTANT
                                 decoration: _input(
                                   'User Name *',
                                   icon: Icons.person,
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      r.isUserNameVisible
-                                          ? Icons.visibility
-                                          : Icons.visibility_off,
+                                      r.isUserNameVisible ? Icons.visibility : Icons.visibility_off,
                                       size: 20,
                                       color: AppTheme.muted,
                                     ),
                                     onPressed: () async {
                                       if (!r.isExisting) {
-                                        setState(
-                                          () => r.isUserNameVisible =
-                                              !r.isUserNameVisible,
-                                        );
+                                        setState(() => r.isUserNameVisible = !r.isUserNameVisible);
                                         return;
                                       }
 
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title: const Text(
-                                            'Show credentials?',
-                                          ),
-                                          content: const Text(
-                                            'This will reveal sensitive login credentials. Make sure no one else is watching.',
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(ctx, false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            ElevatedButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(ctx, true),
-                                              child: const Text('Show'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
+                                      // hide again
+                                      if (r.isUserNameVisible) {
+                                        setState(() {
+                                          r.isUserNameVisible = false;
+                                          r.userNameCtrl.text = _NetworkRow.maskedValue;
+                                        });
+                                        return;
+                                      }
 
-                                      if (confirm != true) return;
-
-                                      final lcoId = widget.lco['_id']
-                                          ?.toString();
+                                      // fetch from backend
+                                      final lcoId = widget.lco['_id']?.toString();
                                       if (lcoId == null) return;
 
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Loading credentials...',
-                                          ),
-                                        ),
+                                      final res = await LcoService.getNetworkCredentials(
+                                        lcoId,
+                                        r.lcoIdCtrl.text.trim(),
                                       );
-
-                                      final res =
-                                          await LcoService.getNetworkCredentials(
-                                            lcoId,
-                                            r.lcoIdCtrl.text,
-                                          );
 
                                       if (!mounted) return;
 
                                       if (res['statusCode'] == 200) {
-                                        r.userNameCtrl.text =
-                                            res['data']['userName'] ?? '';
-                                        r.passwordCtrl.text =
-                                            res['data']['password'] ?? '';
-
                                         setState(() {
+                                          r.userNameCtrl.text = res['data']['userName'] ?? '';
                                           r.isUserNameVisible = true;
-                                          r.isPasswordVisible = true;
                                         });
-                                      } else {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Unable to load credentials',
-                                            ),
-                                          ),
-                                        );
                                       }
                                     },
                                   ),
                                 ),
-                                validator: (v) {
-                                  if (r.isExisting && (v == null || v.isEmpty))
-                                    return null;
-                                  if (v == null || v.trim().isEmpty)
-                                    return 'Required';
-                                  return null;
-                                },
                               ),
 
                               const SizedBox(height: 8),
@@ -458,33 +442,50 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                               // --- PASSWORD FIELD ---
                               TextFormField(
                                 controller: r.passwordCtrl,
-                                obscureText: !r
-                                    .isPasswordVisible, // Toggle based on state
+                                readOnly: r.isExisting && !r.isPasswordVisible,
+                                obscureText: false, // IMPORTANT
                                 decoration: _input(
                                   'Password *',
                                   icon: Icons.lock,
-                                  // Add eye icon to toggle visibility
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      r.isPasswordVisible
-                                          ? Icons.visibility
-                                          : Icons.visibility_off,
+                                      r.isPasswordVisible ? Icons.visibility : Icons.visibility_off,
                                       size: 20,
                                       color: AppTheme.muted,
                                     ),
-                                    onPressed: () => setState(
-                                      () => r.isPasswordVisible =
-                                          !r.isPasswordVisible,
-                                    ),
+                                    onPressed: () async {
+                                      if (!r.isExisting) {
+                                        setState(() => r.isPasswordVisible = !r.isPasswordVisible);
+                                        return;
+                                      }
+
+                                      if (r.isPasswordVisible) {
+                                        setState(() {
+                                          r.isPasswordVisible = false;
+                                          r.passwordCtrl.text = _NetworkRow.maskedValue;
+                                        });
+                                        return;
+                                      }
+
+                                      final lcoId = widget.lco['_id']?.toString();
+                                      if (lcoId == null) return;
+
+                                      final res = await LcoService.getNetworkCredentials(
+                                        lcoId,
+                                        r.lcoIdCtrl.text.trim(),
+                                      );
+
+                                      if (!mounted) return;
+
+                                      if (res['statusCode'] == 200) {
+                                        setState(() {
+                                          r.passwordCtrl.text = res['data']['password'] ?? '';
+                                          r.isPasswordVisible = true;
+                                        });
+                                      }
+                                    },
                                   ),
                                 ),
-                                validator: (v) {
-                                  if (r.isExisting && (v == null || v.isEmpty))
-                                    return null;
-                                  if (v == null || v.trim().isEmpty)
-                                    return 'Required';
-                                  return null;
-                                },
                               ),
                             ],
                           ),
@@ -569,6 +570,7 @@ class _NetworkRow {
   final TextEditingController websiteCtrl;
   final TextEditingController passwordCtrl;
   final TextEditingController fixedPriceCtrl;
+  static const String maskedValue = '********';
 
   // NEW: Visibility states for toggling eye icon
   bool isUserNameVisible = false;

@@ -4,6 +4,54 @@ import '../core/api_config.dart';
 import '../core/money_utils.dart';
 
 class LcoService {
+
+
+  // -----------------------------
+  // OTP FLOW (STRICT IDENTITY)
+  // -----------------------------
+
+  static Future<Map<String, dynamic>> requestOtp({
+    required String phone,
+    required String name,
+    required String email,
+  }) async {
+    final res = await ApiConfig.post(
+      '/api/lcos/request-otp',
+      {
+        'phone': phone.trim(),
+        'name': name.trim(),
+        'email': email.trim(),
+      },
+    );
+
+    return {
+      'statusCode': res['statusCode'],
+      'data': res['body'],
+    };
+  }
+
+  static Future<Map<String, dynamic>> verifyOtp({
+    required String phone,
+    required String otp,
+    required String name,
+    required String email,
+  }) async {
+    final res = await ApiConfig.post(
+      '/api/lcos/verify-otp',
+      {
+        'phone': phone.trim(),
+        'otp': otp.trim(),
+        'name': name.trim(),
+        'email': email.trim(),
+      },
+    );
+
+    return {
+      'statusCode': res['statusCode'],
+      'data': res['body'],
+    };
+  }
+
   // Login (create-or-get) for LCOs
   // On success, will set ApiConfig.sessionKey automatically using returned session.sessionKey
   static Future<Map<String, dynamic>> login({

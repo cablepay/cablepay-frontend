@@ -110,20 +110,31 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
 
     final phone = _normalizePhone(_phoneCtrl.text);
 
-    final res = await ApiConfig.post(
-      '/api/lcos/request-otp',
-      {'phone': phone},
+    // final res = await ApiConfig.post(
+    //   '/api/lcos/request-otp',
+    //   {'phone': phone},
+    // );
+
+    final res = await LcoService.requestOtp(
+      phone: phone,
+      name: _nameCtrl.text,
+      email: _emailCtrl.text,
     );
+
+
 
     if (!mounted) return;
     setState(() => _sending = false);
 
     if (res['statusCode'] != 200) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res['body']?['error'] ?? 'Failed to send OTP')),
+        SnackBar(
+          content: Text(res['data']?['error'] ?? 'Failed to send OTP'),
+        ),
       );
       return;
     }
+
 
     setState(() => _otpSent = true);
 
@@ -148,15 +159,23 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
     try {
       final phone = _normalizePhone(_phoneCtrl.text);
 
-      final res = await ApiConfig.post(
-        '/api/lcos/verify-otp',
-        {
-          'phone': phone,
-          'otp': otp,
-          'name': _nameCtrl.text.trim(),
-          'email': _emailCtrl.text.trim(),
-        },
+      // final res = await ApiConfig.post(
+      //   '/api/lcos/verify-otp',
+      //   {
+      //     'phone': phone,
+      //     'otp': otp,
+      //     'name': _nameCtrl.text.trim(),
+      //     'email': _emailCtrl.text.trim(),
+      //   },
+      // );
+
+      final res = await LcoService.verifyOtp(
+        phone: phone,
+        otp: otp,
+        name: _nameCtrl.text,
+        email: _emailCtrl.text,
       );
+
 
       if (!mounted) return;
 
@@ -165,13 +184,14 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
       if (res['statusCode'] != 200 && res['statusCode'] != 201) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(res['body']?['error'] ?? 'OTP verification failed'),
+            content: Text(res['data']?['error'] ?? 'OTP verification failed'),
           ),
         );
         return;
       }
 
-      final payload = Map<String, dynamic>.from(res['body']);
+
+      final payload = Map<String, dynamic>.from(res['data']);
       final session = Map<String, dynamic>.from(payload['session']);
       final lco = Map<String, dynamic>.from(payload['lco']);
 

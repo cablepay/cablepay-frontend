@@ -48,7 +48,11 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
     setState(() => _sendingOtp = true);
 
     final phone = _phoneCtrl.text.trim();
-    final res = await CustomerService.requestOtp(phone);
+    // final res = await CustomerService.requestOtp(phone);
+    final res = await CustomerService.requestOtp(
+      phone,
+      name: _nameCtrl.text.trim(),
+    );
 
     if (!mounted) return;
     setState(() => _sendingOtp = false);
