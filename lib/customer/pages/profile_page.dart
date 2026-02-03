@@ -223,19 +223,19 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 12),
 
                   // Email
-                  TextFormField(
-                    controller: _emailController,
-                    enabled: _editing && !_saving,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: _inputDecoration(label: 'Email (optional)', icon: Icons.email),
-                    style: const TextStyle(color: AppTheme.text),
-                    validator: (v) {
-                      final text = v?.trim() ?? '';
-                      if (text.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(text)) return 'Enter a valid email';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
+                  // TextFormField(
+                  //   controller: _emailController,
+                  //   enabled: _editing && !_saving,
+                  //   keyboardType: TextInputType.emailAddress,
+                  //   decoration: _inputDecoration(label: 'Email (optional)', icon: Icons.email),
+                  //   style: const TextStyle(color: AppTheme.text),
+                  //   validator: (v) {
+                  //     final text = v?.trim() ?? '';
+                  //     if (text.isNotEmpty && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(text)) return 'Enter a valid email';
+                  //     return null;
+                  //   },
+                  // ),
+                  // const SizedBox(height: 12),
 
                   // District & Pincode row
                   Row(

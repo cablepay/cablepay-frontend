@@ -1,4 +1,6 @@
 import '../core/api_config.dart';
+import '../core/api_error.dart';
+import '../core/api_safe.dart';
 
 class SupportService {
   /* ───────── CUSTOMER ───────── */
@@ -49,16 +51,35 @@ class SupportService {
 
   /* ───────── LCO ───────── */
 
+  // static Future<List<dynamic>> lcoTickets({
+  //   String? networkCode,
+  // }) async {
+  //   final path = networkCode == null
+  //       ? '/api/support/lco/tickets'
+  //       : '/api/support/lco/tickets?networkCode=$networkCode';
+  //
+  //   final res = await ApiConfig.get(path);
+  //   return res['body'] ?? [];
+  // }
+
   static Future<List<dynamic>> lcoTickets({
     String? networkCode,
+    void Function(ApiError e)? onError,
   }) async {
     final path = networkCode == null
         ? '/api/support/lco/tickets'
         : '/api/support/lco/tickets?networkCode=$networkCode';
 
-    final res = await ApiConfig.get(path);
+    final res = await ApiSafe.run(
+          () => ApiConfig.get(path),
+      onError: onError,
+    );
+
+    if (res == null) return [];
+
     return res['body'] ?? [];
   }
+
 
   static Future<void> lcoRespond({
     required String ticketId,

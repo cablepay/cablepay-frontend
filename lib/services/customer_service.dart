@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../core/api_config.dart';
+import '../core/api_error.dart';
+import '../core/api_safe.dart';
 
 class CustomerService {
 
@@ -18,11 +20,49 @@ class CustomerService {
   //   };
   // }
 
-  static Future<Map<String, dynamic>> requestOtp(String phone, {String? name}) async {
-    final res = await ApiConfig.post('/api/auth/request-otp', {
-      'phone': phone.trim(),
-      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
-    });
+  // static Future<Map<String, dynamic>> requestOtp(String phone, {String? name}) async {
+  //   final res = await ApiConfig.post('/api/auth/request-otp', {
+  //     'phone': phone.trim(),
+  //     if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+  //   });
+  //
+  //   return {
+  //     'statusCode': res['statusCode'],
+  //     'data': res['body'],
+  //   };
+  // }
+
+  static Future<Map<String, dynamic>> requestOtp(
+      String phone, {
+        String? name,
+      }) async {
+    ApiError? capturedError;
+
+    final res = await ApiSafe.run(
+          () => ApiConfig.post(
+        '/api/auth/request-otp',
+        {
+          'phone': phone.trim(),
+          if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+        },
+      ),
+      onError: (e) {
+        capturedError = e;
+      },
+    );
+
+    if (res == null && capturedError != null) {
+      return {
+        'statusCode': capturedError!.statusCode ?? 400,
+        'data': {
+          'error': capturedError!.message,
+        },
+      };
+    }
+
+    if (res == null) {
+      return {'statusCode': 0, 'data': null};
+    }
 
     return {
       'statusCode': res['statusCode'],
@@ -31,26 +71,73 @@ class CustomerService {
   }
 
 
+
+
   /// STEP 2: Verify OTP + Login/Create Customer
+  // static Future<Map<String, dynamic>> verifyOtp({
+  //   required String phone,
+  //   required String otp,
+  //   String? name,
+  //   String? referralCode,
+  // }) async {
+  //   final res = await ApiConfig.post('/api/auth/verify-otp', {
+  //     'phone': phone.trim(),
+  //     'otp': otp.trim(),
+  //     if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+  //     if (referralCode != null && referralCode.trim().isNotEmpty)
+  //       'referralCode': referralCode.trim(),
+  //   });
+  //
+  //   return {
+  //     'statusCode': res['statusCode'],
+  //     'data': res['body'],
+  //   };
+  // }
+
   static Future<Map<String, dynamic>> verifyOtp({
     required String phone,
     required String otp,
     String? name,
     String? referralCode,
   }) async {
-    final res = await ApiConfig.post('/api/auth/verify-otp', {
-      'phone': phone.trim(),
-      'otp': otp.trim(),
-      if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
-      if (referralCode != null && referralCode.trim().isNotEmpty)
-        'referralCode': referralCode.trim(),
-    });
+    ApiError? capturedError;
+
+    final res = await ApiSafe.run(
+          () => ApiConfig.post(
+        '/api/auth/verify-otp',
+        {
+          'phone': phone.trim(),
+          'otp': otp.trim(),
+          if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+          if (referralCode != null && referralCode.trim().isNotEmpty)
+            'referralCode': referralCode.trim(),
+        },
+      ),
+      onError: (e) {
+        capturedError = e;
+      },
+    );
+
+    if (res == null && capturedError != null) {
+      return {
+        'statusCode': capturedError!.statusCode ?? 400,
+        'data': {
+          'error': capturedError!.message,
+        },
+      };
+    }
+
+    if (res == null) {
+      return {'statusCode': 0, 'data': null};
+    }
 
     return {
       'statusCode': res['statusCode'],
       'data': res['body'],
     };
   }
+
+
 
   static Future<Map<String, dynamic>> claimReferral({
     required String customerId,
@@ -70,10 +157,29 @@ class CustomerService {
 
 
   // Get customer by id
-  static Future<Map<String, dynamic>> getCustomer(String id) async {
-    final res = await ApiConfig.get('/api/customers/$id');
+  // static Future<Map<String, dynamic>> getCustomer(String id) async {
+  //   final res = await ApiConfig.get('/api/customers/$id');
+  //   return {'statusCode': res['statusCode'], 'data': res['body']};
+  // }
+
+  static Future<Map<String, dynamic>> getCustomer(
+      String id, {
+        void Function(ApiError e)? onError,
+      }) async {
+    final res = await ApiSafe.run(
+          () => ApiConfig.get('/api/customers/$id'),
+      onError: onError,
+    );
+
+    if (res == null) {
+      return {'statusCode': 0, 'data': null};
+    }
+
     return {'statusCode': res['statusCode'], 'data': res['body']};
   }
+
+
+
   // Update customer fields
   static Future<Map<String, dynamic>> updateCustomer(
       String id, Map<String, dynamic> payload) async {

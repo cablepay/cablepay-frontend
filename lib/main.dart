@@ -4,7 +4,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'common/terms_and_privacy_page.dart';
+import 'core/api_error.dart';
+import 'core/app_messenger.dart';
 import 'core/app_theme.dart';
+import 'core/connectivity_guard.dart';
 import 'core/local_storage.dart';
 import 'core/api_config.dart';
 import 'core/local_session.dart'; // optional if you use it
@@ -56,8 +59,13 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Cable Pay',
       theme: AppTheme.theme,
+
+      scaffoldMessengerKey: appMessengerKey,
       // Show splash first; splash will navigate to StartupRouter
-      home: const SplashScreen(),
+      // home: const SplashScreen(),
+      home: ConnectivityGuard(
+        child: const SplashScreen(),
+      ),
       // Keep your route generator intact
       onGenerateRoute: AppRoutes.generateRoute,
     );
@@ -225,9 +233,26 @@ class _StartupRouterState extends State<StartupRouter> {
         final storedCustomer = await LocalStorage.getCustomer();
         if (storedCustomer != null) _customer = Map<String, dynamic>.from(storedCustomer);
       }
-    } catch (_) {
-      // ignore and show login screens
-    } finally {
+    } catch (e) {
+      if (e is ApiError) {
+
+        if (e.type != 'auth') {
+          showGlobalSnack(e.message); // ✅ ADD
+        }
+        debugPrint('API error: ${e.type}');
+
+        if (e.type == 'auth') {
+          await LocalStorage.clearSession();
+          _session = null;
+        }
+
+        // 🔥 DO NOTHING for network / server / timeout
+        // Session is preserved
+      } else {
+        debugPrint('StartupRouter init failed: $e');
+      }
+    }
+    finally {
       if (!mounted) return;
       setState(() => _loading = false);
     }

@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:http/http.dart' as http;
+import 'dart:async';
+import 'api_error.dart';
+
 
 /// Simple, predictable ApiConfig modeled after your small example.
 /// - Web: http://localhost:<port>
@@ -93,17 +96,90 @@ class ApiConfig {
   }
 
   // ---------- Simple HTTP wrappers ----------
+  // static Future<Map<String, dynamic>> get(String path) async {
+  //   final uri = Uri.parse('${baseUrl}$path');
+  //   final res = await http.get(uri, headers: _headers());
+  //   return _decode(res);
+  // }
+
+  // static Future<Map<String, dynamic>> get(String path) async {
+  //   final uri = Uri.parse('${baseUrl}$path');
+  //   try {
+  //     final res = await http
+  //         .get(uri, headers: _headers())
+  //         .timeout(const Duration(seconds: 12));
+  //     return _decode(res);
+  //   } on SocketException {
+  //     throw ApiError(
+  //       type: 'network',
+  //       message: 'No internet connection',
+  //     );
+  //   } on TimeoutException {
+  //     throw ApiError(
+  //       type: 'timeout',
+  //       message: 'Server is taking too long to respond',
+  //     );
+  //   } catch (_) {
+  //     throw ApiError(
+  //       type: 'unknown',
+  //       message: 'Unexpected error',
+  //     );
+  //   }
+  // }
+
   static Future<Map<String, dynamic>> get(String path) async {
     final uri = Uri.parse('${baseUrl}$path');
-    final res = await http.get(uri, headers: _headers());
-    return _decode(res);
+
+    try {
+      final res = await http
+          .get(uri, headers: _headers())
+          .timeout(const Duration(seconds: 12));
+
+      return _decode(res);
+    } on SocketException catch (e) {
+      throw _mapSocketError(e);
+    } on TimeoutException {
+      throw ApiError(
+        type: 'timeout',
+        message: 'Server is slow to respond',
+      );
+    }
   }
 
-  static Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
+
+
+  // static Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
+  //   final uri = Uri.parse('${baseUrl}$path');
+  //   final res = await http.post(uri, headers: _headers(contentJson: true), body: jsonEncode(body));
+  //   return _decode(res);
+  // }
+
+  static Future<Map<String, dynamic>> post(
+      String path,
+      Map<String, dynamic> body,
+      ) async {
     final uri = Uri.parse('${baseUrl}$path');
-    final res = await http.post(uri, headers: _headers(contentJson: true), body: jsonEncode(body));
-    return _decode(res);
+
+    try {
+      final res = await http
+          .post(
+        uri,
+        headers: _headers(contentJson: true),
+        body: jsonEncode(body),
+      )
+          .timeout(const Duration(seconds: 12));
+
+      return _decode(res);
+    } on SocketException catch (e) {
+      throw _mapSocketError(e);
+    } on TimeoutException {
+      throw ApiError(
+        type: 'timeout',
+        message: 'Server is slow to respond',
+      );
+    }
   }
+
 
   static Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${baseUrl}$path');
@@ -134,17 +210,61 @@ class ApiConfig {
     return headers;
   }
 
+  // static Map<String, dynamic> _decode(http.Response res) {
+  //   final code = res.statusCode;
+  //   if (res.body.isEmpty) return {'statusCode': code, 'body': null};
+  //
+  //   try {
+  //     final jsonBody = jsonDecode(res.body);
+  //     return {'statusCode': code, 'body': jsonBody};
+  //   } catch (_) {
+  //     return {'statusCode': code, 'body': res.body};
+  //   }
+  // }
+
   static Map<String, dynamic> _decode(http.Response res) {
     final code = res.statusCode;
-    if (res.body.isEmpty) return {'statusCode': code, 'body': null};
 
-    try {
-      final jsonBody = jsonDecode(res.body);
-      return {'statusCode': code, 'body': jsonBody};
-    } catch (_) {
-      return {'statusCode': code, 'body': res.body};
+    // 5xx – backend is down or crashed
+    if (code >= 500) {
+      throw ApiError(
+        type: 'server',
+        message: 'Service temporarily unavailable',
+        statusCode: code,
+      );
     }
+
+    // Try to parse response body once
+    dynamic body;
+    if (res.body.isNotEmpty) {
+      try {
+        body = jsonDecode(res.body);
+      } catch (_) {
+        body = res.body;
+      }
+    }
+
+    // 401 / 403 – auth OR identity validation
+    if (code == 401 || code == 403) {
+      final backendMessage =
+      body is Map && body['error'] is String
+          ? body['error']
+          : 'Authentication failed';
+
+      throw ApiError(
+        type: 'auth',
+        message: backendMessage,
+        statusCode: code,
+      );
+    }
+
+    return {
+      'statusCode': code,
+      'body': body,
+    };
   }
+
+
 
   // Best-effort Android emulator detection.
   // Not 100% reliable — exposes forceIsEmulator to let you override.
@@ -169,3 +289,31 @@ class ApiConfig {
     return false;
   }
 }
+
+// ApiError _mapSocketError(SocketException e) {
+//   final msg = e.message.toLowerCase();
+//
+//   if (msg.contains('refused') ||
+//       msg.contains('failed host lookup') ||
+//       msg.contains('no route to host')) {
+//     return ApiError(
+//       type: 'server',
+//       message: 'Backend service is not running',
+//     );
+//   }
+//
+//   return ApiError(
+//     type: 'network',
+//     message: 'No internet connection',
+//   );
+// }
+
+ApiError _mapSocketError(SocketException _) {
+  // SocketException ALWAYS means network layer failed
+  // NOT backend logic
+  return ApiError(
+    type: 'network',
+    message: 'No internet connection',
+  );
+}
+

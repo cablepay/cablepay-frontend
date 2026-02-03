@@ -2,33 +2,92 @@
 import 'dart:async';
 import '../core/api_config.dart';
 import '../core/money_utils.dart';
+import '../core/api_safe.dart';
+import '../core/api_error.dart';
 
 class LcoService {
-
+  Map<String, dynamic> _apiErrorResponse(ApiError e) {
+    return {
+      'statusCode': e.statusCode ?? 0,
+      'error': e.message,
+      'type': e.type,
+    };
+  }
 
   // -----------------------------
   // OTP FLOW (STRICT IDENTITY)
   // -----------------------------
+
+  // static Future<Map<String, dynamic>> requestOtp({
+  //   required String phone,
+  //   required String name,
+  //   required String email,
+  // }) async {
+  //   final res = await ApiConfig.post(
+  //     '/api/lcos/request-otp',
+  //     {
+  //       'phone': phone.trim(),
+  //       'name': name.trim(),
+  //       'email': email.trim(),
+  //     },
+  //   );
+  //
+  //   return {
+  //     'statusCode': res['statusCode'],
+  //     'data': res['body'],
+  //   };
+  // }
 
   static Future<Map<String, dynamic>> requestOtp({
     required String phone,
     required String name,
     required String email,
   }) async {
-    final res = await ApiConfig.post(
-      '/api/lcos/request-otp',
-      {
+    ApiError? capturedError;
+
+    final res = await ApiSafe.run(
+          () => ApiConfig.post('/api/lcos/request-otp', {
         'phone': phone.trim(),
         'name': name.trim(),
         'email': email.trim(),
+      }),
+      onError: (e) {
+        capturedError = e;
       },
     );
 
-    return {
-      'statusCode': res['statusCode'],
-      'data': res['body'],
-    };
+    if (res == null && capturedError != null) {
+      return {
+        'statusCode': capturedError!.statusCode ?? 400,
+        'data': {
+          'error': capturedError!.message,
+        },
+      };
+    }
+
+    if (res == null) {
+      return {'statusCode': 0, 'data': null};
+    }
+
+    return {'statusCode': res['statusCode'], 'data': res['body']};
   }
+
+
+  // static Future<Map<String, dynamic>> verifyOtp({
+  //   required String phone,
+  //   required String otp,
+  //   required String name,
+  //   required String email,
+  // }) async {
+  //   final res = await ApiConfig.post('/api/lcos/verify-otp', {
+  //     'phone': phone.trim(),
+  //     'otp': otp.trim(),
+  //     'name': name.trim(),
+  //     'email': email.trim(),
+  //   });
+  //
+  //   return {'statusCode': res['statusCode'], 'data': res['body']};
+  // }
 
   static Future<Map<String, dynamic>> verifyOtp({
     required String phone,
@@ -36,42 +95,37 @@ class LcoService {
     required String name,
     required String email,
   }) async {
-    final res = await ApiConfig.post(
-      '/api/lcos/verify-otp',
-      {
+    final res = await ApiSafe.run(
+      () => ApiConfig.post('/api/lcos/verify-otp', {
         'phone': phone.trim(),
         'otp': otp.trim(),
         'name': name.trim(),
         'email': email.trim(),
-      },
+      }),
+      onError: (e) {},
     );
 
-    return {
-      'statusCode': res['statusCode'],
-      'data': res['body'],
-    };
+    if (res == null) {
+      return {'statusCode': 0, 'data': null};
+    }
+
+    return {'statusCode': res['statusCode'], 'data': res['body']};
   }
 
   // Login (create-or-get) for LCOs
   // On success, will set ApiConfig.sessionKey automatically using returned session.sessionKey
-  static Future<Map<String, dynamic>> login({
-    required String phone,
-  }) async {
-    final payload = {
-      'phone': phone,
-    };
+  static Future<Map<String, dynamic>> login({required String phone}) async {
+    final payload = {'phone': phone};
 
     final res = await ApiConfig.post('/api/lcos/login', payload);
 
-    return {
-      'statusCode': res['statusCode'],
-      'data': res['body'],
-    };
+    return {'statusCode': res['statusCode'], 'data': res['body']};
   }
 
-
-
-  static Future<Map<String, dynamic>> searchNetworks(String q, {int limit = 50}) async {
+  static Future<Map<String, dynamic>> searchNetworks(
+    String q, {
+    int limit = 50,
+  }) async {
     final qEnc = Uri.encodeQueryComponent(q);
     final res = await ApiConfig.get('/api/lcos/search?q=$qEnc&limit=$limit');
     // ApiConfig.get returns {'statusCode':..., 'body':...}
@@ -79,10 +133,26 @@ class LcoService {
   }
 
   // Get LCO by id or by network lcoId (backend allows both)
-  static Future<Map<String, dynamic>> getLco(String idOrNetworkId) async {
-    final res = await ApiConfig.get('/api/lcos/$idOrNetworkId');
-    final status = res['statusCode'] as int? ?? 500;
-    return {'statusCode': status, 'data': res['body']};
+  // static Future<Map<String, dynamic>> getLco(String idOrNetworkId) async {
+  //   final res = await ApiConfig.get('/api/lcos/$idOrNetworkId');
+  //   final status = res['statusCode'] as int? ?? 500;
+  //   return {'statusCode': status, 'data': res['body']};
+  // }
+
+  static Future<Map<String, dynamic>> getLco(
+    String idOrNetworkId, {
+    void Function(ApiError e)? onError,
+  }) async {
+    final res = await ApiSafe.run(
+      () => ApiConfig.get('/api/lcos/$idOrNetworkId'),
+      onError: onError,
+    );
+
+    if (res == null) {
+      return {'statusCode': 0, 'data': null};
+    }
+
+    return {'statusCode': res['statusCode'], 'data': res['body']};
   }
 
   /// Fetch decrypted credentials for a specific network.
@@ -90,23 +160,22 @@ class LcoService {
   ///
   /// GET /api/lcos/:lcoId/networks/:networkId/credentials
   static Future<Map<String, dynamic>> getNetworkCredentials(
-      String lcoId,
-      String networkId,
-      ) async {
+    String lcoId,
+    String networkId,
+  ) async {
     final encoded = Uri.encodeComponent(networkId);
     final res = await ApiConfig.get(
       '/api/lcos/$lcoId/networks/$encoded/credentials',
     );
 
-    return {
-      'statusCode': res['statusCode'],
-      'data': res['body'],
-    };
+    return {'statusCode': res['statusCode'], 'data': res['body']};
   }
 
-
   // Create or update lco details (profile)
-  static Future<Map<String, dynamic>> upsertLco(String lcoId, {required Map<String, dynamic> body}) async {
+  static Future<Map<String, dynamic>> upsertLco(
+    String lcoId, {
+    required Map<String, dynamic> body,
+  }) async {
     if (lcoId == 'new') {
       final res = await ApiConfig.post('/api/lcos', body);
       return {'statusCode': res['statusCode'], 'data': res['body']};
@@ -117,7 +186,10 @@ class LcoService {
 
   /// List boxes registered under an LCO. Uses backend endpoint:
   /// GET /api/lcos/:id/boxes[?networkId=...]
-  static Future<Map<String, dynamic>> listBoxesForLco(String lcoId, {String? networkId}) async {
+  static Future<Map<String, dynamic>> listBoxesForLco(
+    String lcoId, {
+    String? networkId,
+  }) async {
     var path = '/api/lcos/$lcoId/boxes';
     if (networkId != null && networkId.trim().isNotEmpty) {
       path += '?networkId=${Uri.encodeComponent(networkId.trim())}';
@@ -128,27 +200,45 @@ class LcoService {
 
   /// GET /api/lcos/:id/stats
   /// GET /api/lcos/:id/stats[?period=YYYY-MM]
-  static Future<Map<String, dynamic>> getLcoStats(
-      String lcoId, {
-        String? period,
-      }) async {
-    var path = '/api/lcos/$lcoId/stats';
+  // static Future<Map<String, dynamic>> getLcoStats(
+  //     String lcoId, {
+  //       String? period,
+  //     }) async {
+  //   var path = '/api/lcos/$lcoId/stats';
+  //
+  //   if (period != null && period.trim().isNotEmpty) {
+  //     final enc = Uri.encodeComponent(period.trim());
+  //     path += '?period=$enc';
+  //   }
+  //
+  //   final res = await ApiConfig.get(path);
+  //   return {'statusCode': res['statusCode'], 'data': res['body']};
+  // }
 
-    if (period != null && period.trim().isNotEmpty) {
-      final enc = Uri.encodeComponent(period.trim());
-      path += '?period=$enc';
+  static Future<Map<String, dynamic>> getLcoStats(
+    String lcoId, {
+    String? period,
+    void Function(ApiError e)? onError,
+  }) async {
+    var path = '/api/lcos/$lcoId/stats';
+    if (period != null && period.isNotEmpty) {
+      path += '?period=${Uri.encodeComponent(period)}';
     }
 
-    final res = await ApiConfig.get(path);
+    final res = await ApiSafe.run(() => ApiConfig.get(path), onError: onError);
+
+    if (res == null) {
+      return {'statusCode': 0, 'data': null};
+    }
+
     return {'statusCode': res['statusCode'], 'data': res['body']};
   }
 
-
   /// GET /api/lcos/:id/finance
   static Future<Map<String, dynamic>> getLcoFinancials(
-      String lcoId, {
-        String? period,
-      }) async {
+    String lcoId, {
+    String? period,
+  }) async {
     var path = '/api/lcos/$lcoId/finance';
     if (period != null && period.trim().isNotEmpty) {
       final enc = Uri.encodeComponent(period.trim());
@@ -159,10 +249,13 @@ class LcoService {
     return {'statusCode': res['statusCode'], 'data': res['body']};
   }
 
-
   /// GET /api/lcos/:id/networks/:networkId/customers
   /// lcoId can be either LCO._id (ObjectId string) or the LCO's network identifier string.
-  static Future<Map<String, dynamic>> getNetworkCustomers(String lcoId, String networkCode, {String? period}) async {
+  static Future<Map<String, dynamic>> getNetworkCustomers(
+    String lcoId,
+    String networkCode, {
+    String? period,
+  }) async {
     final encodedNetwork = Uri.encodeComponent(networkCode);
     var path = '/api/lcos/$lcoId/networks/$encodedNetwork/customers';
     if (period != null && period.trim().isNotEmpty) {
@@ -172,7 +265,6 @@ class LcoService {
     return {'statusCode': res['statusCode'], 'data': res['body']};
   }
 
-
   /// Set per-box price.
   ///
   /// Preferred: provide amountPaise (integer). If you provide amountRupees (double), function
@@ -181,15 +273,18 @@ class LcoService {
   /// POST /api/lcos/:lcoId/boxes/:boxId/price
   /// Body will include either amountPaise or amountRupees (server supports both). We prefer amountPaise.
   static Future<Map<String, dynamic>> setBoxPrice(
-      String lcoId,
-      String boxId, {
-        int? amountPaise,
-        double? amountRupees,
-        String? note,
-        DateTime? effectiveFrom, // optional; backend may ignore if not supported
-      }) async {
+    String lcoId,
+    String boxId, {
+    int? amountPaise,
+    double? amountRupees,
+    String? note,
+    DateTime? effectiveFrom, // optional; backend may ignore if not supported
+  }) async {
     if (amountPaise == null && amountRupees == null) {
-      return {'statusCode': 400, 'error': 'amountPaise or amountRupees required'};
+      return {
+        'statusCode': 400,
+        'error': 'amountPaise or amountRupees required',
+      };
     }
 
     final payload = <String, dynamic>{};
@@ -205,16 +300,23 @@ class LcoService {
     }
 
     if (note != null && note.trim().isNotEmpty) payload['note'] = note.trim();
-    if (effectiveFrom != null) payload['effectiveFrom'] = effectiveFrom.toIso8601String();
+    if (effectiveFrom != null)
+      payload['effectiveFrom'] = effectiveFrom.toIso8601String();
 
-    final res = await ApiConfig.post('/api/lcos/$lcoId/boxes/$boxId/price', payload);
+    final res = await ApiConfig.post(
+      '/api/lcos/$lcoId/boxes/$boxId/price',
+      payload,
+    );
     final status = res['statusCode'] as int? ?? 500;
     return {'statusCode': status, 'data': res['body']};
   }
 
   /// Remove per-box price override.
   /// DELETE /api/lcos/:lcoId/boxes/:boxId/price
-  static Future<Map<String, dynamic>> removeBoxPrice(String lcoId, String boxId) async {
+  static Future<Map<String, dynamic>> removeBoxPrice(
+    String lcoId,
+    String boxId,
+  ) async {
     final res = await ApiConfig.delete('/api/lcos/$lcoId/boxes/$boxId/price');
     final status = res['statusCode'] as int? ?? 500;
     return {'statusCode': status, 'data': res['body']};
