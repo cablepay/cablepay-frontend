@@ -36,6 +36,11 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
     return v.replaceAll(RegExp(r'[^0-9]'), '');
   }
 
+  Timer? _otpTimer;
+  int _remainingSeconds = 300;
+  bool _canResend = false;
+
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +49,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
 
   @override
   void dispose() {
+    _otpTimer?.cancel();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _otpCtrl.dispose();
@@ -135,17 +141,47 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
       return;
     }
 
-
     setState(() => _otpSent = true);
+    _startOtpTimer();
+
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('OTP sent')),
     );
   }
 
+  void _startOtpTimer() {
+    _otpTimer?.cancel();
+    _remainingSeconds = 300;
+    _canResend = false;
+
+    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingSeconds <= 1) {
+        timer.cancel();
+        setState(() {
+          _remainingSeconds = 0;
+          _canResend = true;
+        });
+      } else {
+        setState(() {
+          _remainingSeconds--;
+        });
+      }
+    });
+  }
+
+
 
 
   Future<void> _verifyAndLogin() async {
+
+    if (_remainingSeconds <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('OTP expired. Please resend OTP')),
+      );
+      return;
+    }
+
     final otp = _otpCtrl.text.trim();
     if (otp.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -548,6 +584,34 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
         ),
         const SizedBox(height: 16),
 
+        Text(
+          _remainingSeconds > 0
+              ? 'OTP expires in ${_remainingSeconds ~/ 60}:${(_remainingSeconds % 60).toString().padLeft(2, '0')}'
+              : 'OTP expired',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            color: _remainingSeconds > 0 ? AppTheme.muted : Colors.red,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        TextButton(
+          onPressed: _canResend
+              ? () {
+            _otpCtrl.clear();
+            _sendOtp();
+          }
+              : null,
+          child: Text(
+            _canResend
+                ? 'Resend OTP'
+                : 'Resend in $_remainingSeconds sec',
+          ),
+        ),
+
+
         SizedBox(
           width: double.infinity,
           height: 52,
@@ -562,11 +626,15 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
         Center(
           child: TextButton.icon(
             onPressed: () {
+              _otpTimer?.cancel();
               setState(() {
                 _otpSent = false;
                 _otpCtrl.clear();
+                _remainingSeconds = 300;
+                _canResend = false;
               });
             },
+
             icon: const Icon(Icons.edit_outlined, size: 18),
             label: const Text('Edit phone number'),
           ),

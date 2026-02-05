@@ -32,9 +32,15 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
   bool _verifyingOtp = false;
   bool _otpSent = false;
 
+  Timer? _otpTimer;
+  int _remainingSeconds = 300; // 5 minutes
+  bool _canResend = false;
+
+
 
   @override
   void dispose() {
+    _otpTimer?.cancel();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _referralCtrl.dispose();
@@ -79,14 +85,45 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       _savedReferralCode = _referralCtrl.text.trim();
     });
 
+    _startOtpTimer();
+
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('OTP sent')),
     );
   }
 
+  void _startOtpTimer() {
+    _otpTimer?.cancel();
+    _remainingSeconds = 300;
+    _canResend = false;
+
+    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingSeconds <= 1) {
+        timer.cancel();
+        setState(() {
+          _remainingSeconds = 0;
+          _canResend = true;
+        });
+      } else {
+        setState(() {
+          _remainingSeconds--;
+        });
+      }
+    });
+  }
+
+
 
   Future<void> _verifyOtpAndLogin() async {
+
+    if (_remainingSeconds <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('OTP expired. Please resend OTP')),
+      );
+      return;
+    }
+
     final otp = _otpCtrl.text.trim();
     if (otp.isEmpty) {
       ScaffoldMessenger.of(context)
@@ -511,6 +548,35 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         ),
         const SizedBox(height: 16),
 
+        Text(
+          _remainingSeconds > 0
+              ? 'OTP expires in ${_remainingSeconds ~/ 60}:${(_remainingSeconds % 60).toString().padLeft(2, '0')}'
+              : 'OTP expired',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            color: _remainingSeconds > 0 ? AppTheme.muted : Colors.red,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        TextButton(
+          onPressed: _canResend
+              ? () {
+            _otpCtrl.clear();
+            _sendOtp();
+          }
+              : null,
+          child: Text(
+            _canResend
+                ? 'Resend OTP'
+                : 'Resend in $_remainingSeconds sec',
+          ),
+        ),
+
+
+
         SizedBox(
           width: double.infinity,
           height: 52,
@@ -527,9 +593,12 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
             onPressed: _sendingOtp
                 ? null
                 : () {
+              _otpTimer?.cancel();
               setState(() {
                 _otpSent = false;
                 _otpCtrl.clear();
+                _remainingSeconds = 300;
+                _canResend = false;
               });
             },
             icon: const Icon(Icons.edit_outlined, size: 18),

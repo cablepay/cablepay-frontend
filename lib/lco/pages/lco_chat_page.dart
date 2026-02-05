@@ -61,15 +61,20 @@ class _LcoChatPageState extends State<LcoChatPage> {
       _loading = true;
     });
 
-    final msgs = await SupportService.ticketMessages(ticket['_id']);
+    // final res = await SupportService.ticketMessages(ticket['_id']);
+    final res = await SupportService.lcoTicketWithMessages(ticket['_id']);
 
     if (!mounted) return;
+
     setState(() {
-      _messages = msgs;
+      _activeTicket = res['ticket'];     // ✅ UPDATED
+      _messages = res['messages'];       // ✅ UPDATED
       _loading = false;
     });
+
     _scrollToBottom();
   }
+
 
   Future<void> _sendReply({bool resolve = false}) async {
     if (_controller.text.trim().isEmpty || _activeTicket == null) return;
@@ -87,8 +92,11 @@ class _LcoChatPageState extends State<LcoChatPage> {
       setState(() => _activeTicket = null);
       _loadTickets();
     } else {
-      final msgs = await SupportService.ticketMessages(_activeTicket!['_id']);
-      setState(() => _messages = msgs);
+      final res = await SupportService.lcoTicketWithMessages(_activeTicket!['_id']);
+      setState(() {
+        _activeTicket = res['ticket'];
+        _messages = res['messages'];
+      });
       _scrollToBottom();
     }
   }
@@ -110,9 +118,13 @@ class _LcoChatPageState extends State<LcoChatPage> {
               onPressed: () => setState(() => _activeTicket = null)
           )
               : null,
+          // title: Text(_activeTicket == null
+          //     ? 'Support Tickets'
+          //     : 'Chat: ${_activeTicket!['networkCode']}'),
           title: Text(_activeTicket == null
               ? 'Support Tickets'
-              : 'Chat: ${_activeTicket!['networkCode']}'),
+              : 'Chat: ${_activeTicket!['customer']?['name'] ?? 'Customer'} (${_activeTicket!['customer']?['phone'] ?? '-'})'),
+
           actions: [
             if (_activeTicket == null)
               IconButton(onPressed: _loadTickets, icon: const Icon(Icons.refresh))

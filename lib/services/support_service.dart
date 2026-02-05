@@ -39,6 +39,20 @@ class SupportService {
     return res['body'] ?? [];
   }
 
+  static Future<Map<String, dynamic>> lcoTicketWithMessages(String ticketId) async {
+    final res = await ApiConfig.get(
+      '/api/support/lco/tickets/$ticketId/messages',
+    );
+
+    final body = res['body'] ?? {};
+
+    return {
+      'ticket': body['ticket'],
+      'messages': body['messages'] ?? [],
+    };
+  }
+
+
   static Future<void> customerReply({
     required String ticketId,
     required String message,
