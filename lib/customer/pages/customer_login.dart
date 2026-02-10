@@ -113,11 +113,55 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
     });
   }
 
+  Future<void> _resendOtp() async {
+    // Reset timer state BEFORE sending
+    _otpTimer?.cancel();
+    setState(() {
+      _remainingSeconds = 300;
+      _canResend = false;
+    });
+
+    // Do NOT revalidate full form on resend
+    setState(() => _sendingOtp = true);
+
+    final phone = _phoneCtrl.text.trim();
+
+    final res = await CustomerService.requestOtp(
+      phone,
+      name: _nameCtrl.text.trim(),
+    );
+
+    if (!mounted) return;
+    setState(() => _sendingOtp = false);
+
+    if (res['statusCode'] != 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['data']?['error'] ?? 'Failed to resend OTP')),
+      );
+      return;
+    }
+
+    // DEV OTP autofill
+    if (!kReleaseMode) {
+      final devOtp = res['data']?['devOtp'];
+      if (devOtp != null) {
+        _otpCtrl.text = devOtp.toString();
+      }
+    }
+
+    _startOtpTimer();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('OTP resent')),
+    );
+  }
+
+
 
 
   Future<void> _verifyOtpAndLogin() async {
 
-    if (_remainingSeconds <= 0) {
+    if (_remainingSeconds <= 0 && !_canResend) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('OTP expired. Please resend OTP')),
       );
@@ -565,7 +609,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
           onPressed: _canResend
               ? () {
             _otpCtrl.clear();
-            _sendOtp();
+            _resendOtp();   // ✅ correct resend flow
           }
               : null,
           child: Text(

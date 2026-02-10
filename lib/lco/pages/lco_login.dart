@@ -170,6 +170,39 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
     });
   }
 
+  Future<void> _resendOtp() async {
+    _otpTimer?.cancel();
+    setState(() {
+      _remainingSeconds = 300;
+      _canResend = false;
+    });
+
+    setState(() => _sending = true);
+
+    final phone = _normalizePhone(_phoneCtrl.text);
+
+    final res = await LcoService.requestOtp(
+      phone: phone,
+      name: _nameCtrl.text,
+      email: _emailCtrl.text,
+    );
+
+    if (!mounted) return;
+    setState(() => _sending = false);
+
+    if (res['statusCode'] != 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['data']?['error'] ?? 'Failed to resend OTP')),
+      );
+      return;
+    }
+
+    _startOtpTimer();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('OTP resent')),
+    );
+  }
 
 
 
@@ -601,7 +634,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
           onPressed: _canResend
               ? () {
             _otpCtrl.clear();
-            _sendOtp();
+            _resendOtp();
           }
               : null,
           child: Text(
