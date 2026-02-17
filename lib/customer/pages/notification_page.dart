@@ -1,6 +1,6 @@
-// lib/common/pages/notification_page.dart
 import 'package:flutter/material.dart';
 import '../../core/api_config.dart';
+import '../../core/app_theme.dart';
 
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
@@ -24,22 +24,17 @@ class _NotificationPageState extends State<NotificationPage> {
       final res = await ApiConfig.get('/api/notifications/my');
       final list = (res['body'] as List?) ?? [];
 
+      if (!mounted) return;
+
       setState(() {
         items = list;
         loading = false;
       });
-
-      // 🔥 Mark all unread as read after loading
-      for (final n in list) {
-        if (n is Map && n['read'] == false) {
-          ApiConfig.post('/api/notifications/${n['_id']}/read', {});
-        }
-      }
     } catch (_) {
+      if (!mounted) return;
       setState(() => loading = false);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -55,10 +50,34 @@ class _NotificationPageState extends State<NotificationPage> {
           itemCount: items.length,
           itemBuilder: (context, i) {
             final n = items[i] as Map<String, dynamic>;
+
             return ListTile(
-              leading: const Icon(Icons.notifications),
-              title: Text(n['title'] ?? ''),
+              leading: Icon(
+                Icons.notifications,
+                color: n['read'] == true
+                    ? Colors.grey
+                    : AppTheme.primary,
+              ),
+              title: Text(
+                n['title'] ?? '',
+                style: TextStyle(
+                  fontWeight: n['read'] == true
+                      ? FontWeight.normal
+                      : FontWeight.bold,
+                ),
+              ),
               subtitle: Text(n['body'] ?? ''),
+              onTap: () async {
+                if (n['read'] != true) {
+                  await ApiConfig.post(
+                    '/api/notifications/${n['_id']}/read',
+                    {},
+                  );
+                  setState(() {
+                    n['read'] = true;
+                  });
+                }
+              },
             );
           },
         ),

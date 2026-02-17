@@ -45,20 +45,31 @@ class _ChatPageState extends State<ChatPage> {
 
     final tickets = await SupportService.customerTickets();
 
-    // Only treat truly active tickets as active
-    final active = tickets.isNotEmpty ? tickets.first : null;
+// Always show the latest ticket (even if resolved)
+    if (tickets.isNotEmpty) {
+      // Ensure newest ticket is picked (defensive sort)
+      tickets.sort((a, b) {
+        final ta = DateTime.tryParse(a['createdAt'] ?? '') ?? DateTime(1970);
+        final tb = DateTime.tryParse(b['createdAt'] ?? '') ?? DateTime(1970);
+        return tb.compareTo(ta);
+      });
 
-    if (active != null) {
-      final msgs = await SupportService.ticketMessages(active['_id']);
+      final latest = tickets.first;
+
+      final msgs = await SupportService.ticketMessages(latest['_id']);
       if (!mounted) return;
+
       setState(() {
-        _activeTicket = active;
+        _activeTicket = latest;
         _messages = msgs;
+        _questions = [];   // hide questions if ticket exists
         _loading = false;
       });
+
       _scrollToBottom();
       return;
     }
+
 
     // No active ticket → show questions
     final q = await SupportService.listQuestions();
