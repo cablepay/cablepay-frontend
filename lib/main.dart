@@ -159,6 +159,23 @@ class _StartupRouterState extends State<StartupRouter> {
             text = 'Your box has expired. Please pay to continue service';
             break;
 
+          case 'SUPPORT_NEW_TICKET':
+            text = 'New support request from customer';
+            break;
+
+          case 'SUPPORT_CUSTOMER_REPLY':
+            text = 'Customer replied to your support ticket';
+            break;
+
+          case 'SUPPORT_LCO_REPLY':
+            text = 'Operator replied to your ticket';
+            break;
+
+          case 'SUPPORT_TICKET_RESOLVED':
+            text = 'Your ticket has been resolved';
+            break;
+
+
           default:
             return; // ignore unknown notifications
         }

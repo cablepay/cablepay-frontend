@@ -42,11 +42,11 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _initSupport() async {
     setState(() => _loading = true);
+
     final tickets = await SupportService.customerTickets();
-    final active = tickets.cast<Map<String, dynamic>?>().firstWhere(
-      (t) => t != null && t['status'] != 'closed',
-      orElse: () => null,
-    );
+
+    // Only treat truly active tickets as active
+    final active = tickets.isNotEmpty ? tickets.first : null;
 
     if (active != null) {
       final msgs = await SupportService.ticketMessages(active['_id']);
@@ -60,30 +60,27 @@ class _ChatPageState extends State<ChatPage> {
       return;
     }
 
+    // No active ticket → show questions
     final q = await SupportService.listQuestions();
     if (!mounted) return;
     setState(() {
       _questions = q;
+      _activeTicket = null;
+      _messages = [];
       _loading = false;
     });
-
-    if (active == null) {
-      final q = await SupportService.listQuestions();
-      if (!mounted) return;
-      setState(() {
-        _questions = q;
-        _loading = false;
-      });
-    }
   }
 
   Future<void> _sendInitialQuestion(String questionId) async {
     setState(() => _loading = true);
+
     final ticket = await SupportService.createTicket(
       boxId: widget.boxId,
       questionId: questionId,
     );
+
     final msgs = await SupportService.ticketMessages(ticket['_id']);
+
     if (!mounted) return;
     setState(() {
       _activeTicket = ticket;
@@ -91,6 +88,7 @@ class _ChatPageState extends State<ChatPage> {
       _questions = [];
       _loading = false;
     });
+
     _scrollToBottom();
   }
 
@@ -105,10 +103,9 @@ class _ChatPageState extends State<ChatPage> {
       message: message,
     );
 
-    // 🔁 Always re-fetch ticket + messages
     final tickets = await SupportService.customerTickets();
     final updated = tickets.firstWhere(
-      (t) => t['_id'] == _activeTicket!['_id'],
+          (t) => t['_id'] == _activeTicket!['_id'],
       orElse: () => null,
     );
 
@@ -123,45 +120,60 @@ class _ChatPageState extends State<ChatPage> {
     _scrollToBottom();
   }
 
+  void _resetToNewTicketFlow() async {
+    setState(() {
+      _activeTicket = null;
+      _messages = [];
+      _questions = [];
+      _loading = true;
+    });
+
+    final q = await SupportService.listQuestions();
+    if (!mounted) return;
+    setState(() {
+      _questions = q;
+      _loading = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7F9),
       appBar: AppBar(
-        title: const Text(
-          'Help & Support',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
+        title: const Text('Help & Support', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _initSupport, // reload ticket + messages
+          ),
+        ],
       ),
+
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
-              children: [
-                Expanded(
-                  child: _messages.isEmpty
-                      ? _EmptySupportState(
-                          questions: _questions,
-                          onSelect: _sendInitialQuestion,
-                        )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 20,
-                          ),
-                          itemCount: _messages.length,
-                          itemBuilder: (_, i) => _ChatBubble(
-                            message: _messages[i],
-                            isCustomer:
-                                _messages[i]['senderType'] == 'customer',
-                          ),
-                        ),
-                ),
-                _buildInputArea(),
-              ],
+        children: [
+          Expanded(
+            child: _activeTicket == null
+                ? _EmptySupportState(
+              questions: _questions,
+              onSelect: _sendInitialQuestion,
+            )
+                : ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              itemCount: _messages.length,
+              itemBuilder: (_, i) => _ChatBubble(
+                message: _messages[i],
+                isCustomer: _messages[i]['senderType'] == 'customer',
+              ),
             ),
+          ),
+          _buildInputArea(),
+        ],
+      ),
     );
   }
 
@@ -171,8 +183,7 @@ class _ChatPageState extends State<ChatPage> {
     final status = _activeTicket!['status'];
     final canReply = _activeTicket!['customerCanReply'] == true;
 
-    // 🔒 Ticket resolved → read-only
-    if (status == 'resolved') {
+    if (status == 'resolved' || status == 'closed') {
       return Container(
         padding: const EdgeInsets.all(12),
         color: Colors.white,
@@ -180,33 +191,18 @@ class _ChatPageState extends State<ChatPage> {
           children: [
             Text(
               'This ticket is resolved.',
-              style: TextStyle(
-                color: Colors.green.shade700,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
-            Text(
-              'If the issue continues, please raise a new ticket.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12),
-            ),
-            const SizedBox(height: 12),
             ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _activeTicket = null;
-                  _messages = [];
-                });
-              },
-              child: const Text('Raise New Ticket'),
+              onPressed: _resetToNewTicketFlow,
+              child: const Text('Start New Ticket'),
             ),
           ],
         ),
       );
     }
 
-    // ⏳ Waiting for LCO
     if (!canReply) {
       return Container(
         padding: const EdgeInsets.all(12),
@@ -218,7 +214,6 @@ class _ChatPageState extends State<ChatPage> {
       );
     }
 
-    // ✅ Allowed to reply (rare case)
     return _replyInput();
   }
 
@@ -248,6 +243,7 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 }
+
 
 class _ChatBubble extends StatelessWidget {
   final dynamic message;

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/api_config.dart';
 import '../../core/local_storage.dart';
+import '../../customer/pages/notification_page.dart';
 import '../../routes.dart';
 import '../../services/lco_service.dart';
 import '../../core/app_theme.dart';
@@ -32,6 +33,10 @@ class _LcoHomePageState extends State<LcoHomePage> {
   final currencyFormat = NumberFormat.decimalPattern();
   DateTime? _overviewMonth; // null => current month
 
+  int _unreadNotificationCount = 0;
+  bool _loadingUnread = false;
+
+
   String get _overviewMonthLabel {
     final dt = _overviewMonth ?? DateTime.now();
     return DateFormat.yMMM().format(dt); // e.g. "Dec 2025"
@@ -41,6 +46,7 @@ class _LcoHomePageState extends State<LcoHomePage> {
   void initState() {
     super.initState();
     _loadAll();
+    _loadUnreadNotifications(); // 🔔 add this
   }
 
   String? _resolvePeriodForApi() {
@@ -79,6 +85,26 @@ class _LcoHomePageState extends State<LcoHomePage> {
       financeLoading = false;
     });
   }
+
+  Future<void> _loadUnreadNotifications() async {
+    if (ApiConfig.sessionKey == null || ApiConfig.sessionKey!.isEmpty) return;
+
+    try {
+      _loadingUnread = true;
+      final res = await ApiConfig.get('/api/notifications/unread-count');
+
+      if (!mounted) return;
+
+      setState(() {
+        _unreadNotificationCount = (res['body']?['count'] ?? 0) as int;
+      });
+    } catch (_) {
+      // silent fail – do not break UI
+    } finally {
+      _loadingUnread = false;
+    }
+  }
+
 
   Future<void> _loadLco() async {
     final id = widget.lco['_id'] ?? widget.lco['id'];
@@ -2026,20 +2052,57 @@ class _LcoHomePageState extends State<LcoHomePage> {
               ),
             ),
 
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            color: AppTheme.onPrimary,
-            onPressed: () {
-              // TODO: notification screen
-            },
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none),
+                color: AppTheme.onPrimary,
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationPage()),
+                  );
+
+                  // Refresh unread count after returning
+                  _loadUnreadNotifications();
+                },
+              ),
+              if (_unreadNotificationCount > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    child: Text(
+                      '$_unreadNotificationCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
+
 
           const SizedBox(width: 6),
         ],
       ),
 
       body: RefreshIndicator(
-        onRefresh: _loadAll,
+        onRefresh: () async {
+          await _loadAll();
+          await _loadUnreadNotifications();
+        },
+
         color: AppTheme.primary,
         child: Center(
           child: ConstrainedBox(

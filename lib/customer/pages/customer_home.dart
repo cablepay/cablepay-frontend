@@ -20,6 +20,8 @@ import '../../core/safe_state.dart';
 import '../../core/date_utils.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
+import 'notification_page.dart';
+
 class CustomerHomePage extends StatefulWidget {
   final Map<String, dynamic> customer;
   const CustomerHomePage({Key? key, required this.customer}) : super(key: key);
@@ -60,6 +62,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   Map<String, dynamic>? _pendingPaymentContext;
 
+  int _unreadNotificationCount = 0;
+  bool _loadingUnread = false;
+
+
   // modify initState to fetch wallet for the card (keep existing calls)
 
   @override
@@ -85,6 +91,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
     await _loadBoxes();
     await _loadWalletForCard();
+    await _loadUnreadNotifications();
   }
 
   Future<void> _loadBoxes() async {
@@ -233,6 +240,27 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
     return null;
   }
+
+  Future<void> _loadUnreadNotifications() async {
+    if (ApiConfig.sessionKey == null || ApiConfig.sessionKey!.isEmpty) return;
+
+    try {
+      _loadingUnread = true;
+      final res = await ApiConfig.get('/api/notifications/unread-count');
+
+      if (!mounted) return;
+
+      setState(() {
+        _unreadNotificationCount = (res['body']?['count'] ?? 0) as int;
+      });
+    } catch (_) {
+      // silent fail – don't break UI
+    } finally {
+      _loadingUnread = false;
+    }
+  }
+
+
 
 
   Future<void> _confirmAndPay(Map<String, dynamic> box) async {
@@ -1282,13 +1310,17 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     }
 
     // decide wallet text: prefer live card state, fallback to widget.customer stored value
+    // final walletText = _cardWalletLoading
+    //     ? '...'
+    //     : (_cardWalletPaise != 0
+    //           ? _safeWallet(_cardWalletPaise)
+    //           : (widget.customer['walletPaise'] != null
+    //                 ? _safeWallet(widget.customer['walletPaise'])
+    //                 : '₹0.00'));
     final walletText = _cardWalletLoading
         ? '...'
-        : (_cardWalletPaise != 0
-              ? _safeWallet(_cardWalletPaise)
-              : (widget.customer['walletPaise'] != null
-                    ? _safeWallet(widget.customer['walletPaise'])
-                    : '₹0.00'));
+        : _formatWallet(_cardWalletPaise);
+
 
     // central styles
     final titleStyle = const TextStyle(
@@ -1630,13 +1662,44 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           //   onPressed: _loadBoxes,
           //   icon: Icon(Icons.refresh, color: AppTheme.primary),
           // ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            color: AppTheme.primary,
-            onPressed: () {
-              // TODO: notification screen
-            },
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_none),
+                color: AppTheme.primary,
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NotificationPage()),
+                  );
+                  _loadUnreadNotifications(); // refresh count after return
+                },
+              ),
+              if (_unreadNotificationCount > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    child: Text(
+                      '$_unreadNotificationCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
+
 
           // ---- NEW: Profile navigation button ----
           IconButton(

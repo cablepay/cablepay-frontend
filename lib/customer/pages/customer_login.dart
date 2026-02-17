@@ -73,10 +73,11 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
     // ✅ DEV ONLY convenience
     if (!kReleaseMode) {
       final devOtp = res['data']?['devOtp'];
-      if (devOtp != null) {
-        _otpCtrl.text = devOtp.toString();
+      if (devOtp != null && devOtp.toString().trim().length == 6 && devOtp != '000000') {
+        _otpCtrl.text = devOtp.toString().trim();
       }
     }
+
 
     // setState(() => _otpSent = true);
 
@@ -121,6 +122,9 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       _canResend = false;
     });
 
+    // Clear OTP boxes before resend
+    _otpCtrl.clear();
+
     // Do NOT revalidate full form on resend
     setState(() => _sendingOtp = true);
 
@@ -142,12 +146,12 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
     }
 
     // DEV OTP autofill
-    if (!kReleaseMode) {
-      final devOtp = res['data']?['devOtp'];
-      if (devOtp != null) {
-        _otpCtrl.text = devOtp.toString();
-      }
-    }
+    // if (!kReleaseMode) {
+    //   final devOtp = res['data']?['devOtp'];
+    //   if (devOtp != null) {
+    //     _otpCtrl.text = devOtp.toString();
+    //   }
+    // }
 
     _startOtpTimer();
 
@@ -546,7 +550,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         _buildTopBrand(),
         const SizedBox(height: 18),
         Text(
-          'Enter the 4-digit OTP sent to',
+          'Enter the 6-digit OTP sent to',
           textAlign: TextAlign.center,
           style: TextStyle(color: AppTheme.muted, fontSize: 13),
         ),
@@ -562,34 +566,38 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         const SizedBox(height: 20),
 
         // OTP field (keeps existing behaviour)
-        TextFormField(
-          controller: _otpCtrl,
-          keyboardType: TextInputType.number,
-          maxLength: 4,
-          decoration: InputDecoration(
-            labelText: 'OTP',
-            hintText: '4-digit code',
-            prefixIcon: const Icon(Icons.lock_outline_rounded),
-            filled: true,
-            fillColor: AppTheme.surface,
-            counterText: '',
-            contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: AppTheme.divider),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: AppTheme.divider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide:
-              BorderSide(color: AppTheme.primary, width: 2),
-            ),
-          ),
-        ),
+        // TextFormField(
+        //   controller: _otpCtrl,
+        //   keyboardType: TextInputType.number,
+        //   maxLength: 6,
+        //   autofillHints: const [],        // 🚫 disable OS autofill
+        //   enableSuggestions: false,
+        //   autocorrect: false,
+        //   decoration: InputDecoration(
+        //     labelText: 'OTP',
+        //     hintText: '6-digit code',
+        //     prefixIcon: const Icon(Icons.lock_outline_rounded),
+        //     filled: true,
+        //     fillColor: AppTheme.surface,
+        //     counterText: '',
+        //     contentPadding:
+        //     const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        //     border: OutlineInputBorder(
+        //       borderRadius: BorderRadius.circular(14),
+        //       borderSide: BorderSide(color: AppTheme.divider),
+        //     ),
+        //     enabledBorder: OutlineInputBorder(
+        //       borderRadius: BorderRadius.circular(14),
+        //       borderSide: BorderSide(color: AppTheme.divider),
+        //     ),
+        //     focusedBorder: OutlineInputBorder(
+        //       borderRadius: BorderRadius.circular(14),
+        //       borderSide:
+        //       BorderSide(color: AppTheme.primary, width: 2),
+        //     ),
+        //   ),
+        // ),
+        OtpSixBox(controller: _otpCtrl),
         const SizedBox(height: 16),
 
         Text(
@@ -703,4 +711,98 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
     );
   }
 }
+
+class OtpSixBox extends StatefulWidget {
+  final TextEditingController controller;
+
+  const OtpSixBox({Key? key, required this.controller}) : super(key: key);
+
+  @override
+  State<OtpSixBox> createState() => _OtpSixBoxState();
+}
+
+class _OtpSixBoxState extends State<OtpSixBox> {
+  late List<TextEditingController> _boxes;
+  late List<FocusNode> _focus;
+
+  final List<String> _otpBuffer = List.filled(6, '');
+
+  bool _internalUpdate = false; // 🔴 prevents feedback loop
+
+  @override
+  void initState() {
+    super.initState();
+    _boxes = List.generate(6, (_) => TextEditingController());
+    _focus = List.generate(6, (_) => FocusNode());
+
+    widget.controller.addListener(_syncFromParent);
+  }
+
+  void _syncFromParent() {
+    if (_internalUpdate) return; // 🔥 break feedback loop
+
+    final text = widget.controller.text;
+
+    for (int i = 0; i < 6; i++) {
+      final char = (i < text.length) ? text[i] : '';
+      _otpBuffer[i] = char;
+      _boxes[i].text = char;
+    }
+  }
+
+  void _syncToParent() {
+    _internalUpdate = true;
+    widget.controller.text = _otpBuffer.join();
+    _internalUpdate = false;
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_syncFromParent);
+    for (final c in _boxes) c.dispose();
+    for (final f in _focus) f.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(int i, String v) {
+    if (v.isEmpty) {
+      _otpBuffer[i] = '';
+      _boxes[i].text = '';
+      if (i > 0) _focus[i - 1].requestFocus();
+    } else {
+      final digit = v[v.length - 1];
+      _otpBuffer[i] = digit;
+      _boxes[i].text = digit;
+      if (i < 5) _focus[i + 1].requestFocus();
+    }
+
+    _syncToParent();
+  }
+
+  Widget _buildBox(int i) {
+    return SizedBox(
+      width: 48,
+      child: TextField(
+        controller: _boxes[i],
+        focusNode: _focus[i],
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        maxLength: 1,
+        decoration: const InputDecoration(counterText: ''),
+        onChanged: (v) => _onChanged(i, v),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(6, _buildBox),
+    );
+  }
+}
+
+
+
 
