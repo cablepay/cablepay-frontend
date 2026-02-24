@@ -278,15 +278,20 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
       }
       final lcoIdToSend = (perNetworkId != null && perNetworkId.trim().isNotEmpty) ? perNetworkId : lcoRefVal?.toString();
 
-      await CustomerService.updateCustomer(
-        customerId.toString(),
-        {
-          'name': _nameCtrl.text.trim(),
-          'phone': _phoneCtrl.text.trim(),
-          'district': _districtCtrl.text.trim(),
-          'pincode': _pincodeCtrl.text.trim(),
-        },
-      );
+      final Map<String, dynamic> payload = {
+        'name': _nameCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+      };
+
+      if (_districtCtrl.text.trim().isNotEmpty) {
+        payload['district'] = _districtCtrl.text.trim();
+      }
+
+      if (_pincodeCtrl.text.trim().isNotEmpty) {
+        payload['pincode'] = _pincodeCtrl.text.trim();
+      }
+
+      await CustomerService.updateCustomer(customerId.toString(), payload);
 
       // Pass XFile to createBox (service handles bytes for web & mobile)
       final res = await CustomerService.createBox(

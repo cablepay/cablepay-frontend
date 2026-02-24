@@ -22,6 +22,11 @@ class ApiConfig {
   // session token (nullable)
   static String? sessionKey;
 
+  static String phonepeEnv = 'SANDBOX';
+  // use 'PROD' in production builds
+
+  static String phonepeMerchantId = 'YOUR_PHONEPE_MERCHANT_ID';
+
   // Optional manual switch if emulator detection is unreliable
   // If null, the code will try a best-effort auto-detect.
   static bool? forceIsEmulator;

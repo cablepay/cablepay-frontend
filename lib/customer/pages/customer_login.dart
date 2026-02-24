@@ -380,7 +380,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
         ),
         const SizedBox(height: 14),
         Text(
-          'Cable Pay',
+          'Cable Smart Pay',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w900,

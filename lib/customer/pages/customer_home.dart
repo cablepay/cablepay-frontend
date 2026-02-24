@@ -19,6 +19,7 @@ import 'customer_history.dart';
 import '../../core/safe_state.dart';
 import '../../core/date_utils.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:phonepe_payment_sdk/phonepe_payment_sdk.dart';
 
 import 'notification_page.dart';
 
@@ -65,7 +66,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   int _unreadNotificationCount = 0;
   bool _loadingUnread = false;
 
-
   // modify initState to fetch wallet for the card (keep existing calls)
 
   @override
@@ -78,7 +78,19 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (response) {});
 
+    _initPhonePe();
     _init();
+  }
+
+  Future<void> _initPhonePe() async {
+    final ok = await PhonePePaymentSdk.init(
+      ApiConfig.phonepeEnv == 'PROD' ? 'PRODUCTION' : 'SANDBOX',
+      ApiConfig.phonepeMerchantId,
+      widget.customer['_id'].toString(), // flowId
+      false,
+    );
+
+    debugPrint('PhonePe SDK init: $ok');
   }
 
   Future<void> _init() async {
@@ -260,9 +272,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     }
   }
 
-
-
-
   Future<void> _confirmAndPay(Map<String, dynamic> box) async {
     if (!_hasSession) return;
 
@@ -271,9 +280,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final boxId = (box['_id'] ?? box['id']);
 
     if (customerId == null || boxId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Missing identifiers')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Missing identifiers')));
       return;
     }
 
@@ -399,7 +408,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         "useWallet": _useWalletForBox[idStr] == true,
       });
 
-
       final data = orderRes['body'];
 
       if (orderRes['statusCode'] != 200) {
@@ -419,7 +427,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         await _loadWalletForCard();
         return;
 
-
         // setState(() => activating[idStr] = false);
         //
         // if (apiRes['statusCode'] == 200) {
@@ -434,6 +441,51 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         // return;
       }
 
+      // 6. Check if Wallet fully covers payment (Backend Logic)
+      if (data['skipRazorpay'] == true) {
+        setState(() => activating[idStr] = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment successful (wallet used)')),
+        );
+
+        await _loadBoxes();
+        await _loadWalletForCard();
+        return;
+      }
+
+// 🔥 ADD THIS BLOCK (PhonePe handling)
+      final gateway = data['gateway']; // backend decides: 'razorpay' or 'phonepe'
+
+      if (gateway == 'phonepe') {
+        final String request = jsonEncode({
+          "orderId": data['orderId'],        // from backend (PhonePe orderId)
+          "merchantId": data['merchantId'],  // from backend
+          "token": data['token'],            // from backend
+          "paymentMode": {"type": "PAY_PAGE"}
+        });
+
+        final result = await PhonePePaymentSdk.startTransaction(
+          request,
+          "yourappscheme", // iOS only (use your URL scheme), Android can pass ""
+        );
+
+        final status = result?['status'];
+
+        if (status == 'SUCCESS') {
+          // ❗ Do NOT call /activate for PhonePe.
+          // Webhook will activate the box.
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment initiated. Please wait...')),
+          );
+
+          setState(() => activating[idStr] = false);
+          await _loadBoxes();
+          return;
+        } else {
+          throw Exception(result?['error'] ?? 'PhonePe payment failed');
+        }
+      }
 
 
       // var options = {
@@ -460,12 +512,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         'name': 'CablePay',
         'description': 'Subscription Payment',
         'order_id': data['orderId'],
-        'prefill': {
-          'contact': widget.customer['phone'] ?? '',
-        },
-        'theme': {
-          'color': '#3568B1',
-        },
+        'prefill': {'contact': widget.customer['phone'] ?? ''},
+        'theme': {'color': '#3568B1'},
         'config': {
           'display': {
             'blocks': {
@@ -488,18 +536,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ],
               },
             },
-            'sequence': [
-              'block.upi_intent',
-              'block.upi_collect',
-            ],
-            'preferences': {
-              'show_default_blocks': false,
-            },
+            'sequence': ['block.upi_intent', 'block.upi_collect'],
+            'preferences': {'show_default_blocks': false},
           },
         },
       };
-
-
 
       _pendingPaymentContext = {
         "customerId": customerId,
@@ -508,15 +549,13 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         "useWallet": _useWalletForBox[idStr] == true,
       };
 
-
       _razorpay.open(options);
-
     } catch (e) {
       if (!mounted) return;
       setState(() => activating[idStr] = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
@@ -525,23 +564,43 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
     if (ctx == null) return;
 
+    // try {
+    //   final payload = {
+    //     "period": ctx["period"],
+    //     "paymentId": response.paymentId,
+    //     "orderId": response.orderId,
+    //     "signature": response.signature,
+    //     "useWallet": ctx["useWallet"],
+    //   };
+    //
+    //   // final apiRes = await ApiConfig.post(
+    //   //   '/api/customers/${ctx["customerId"]}/boxes/${ctx["boxId"]}/activate',
+    //   //   payload,
+    //   // );
+    //   //
+    //   // if (!mounted) return;
+    //   //
+    //   // final statusCode = apiRes['statusCode'] as int? ?? 500;
+    //
+    //   final apiRes = await ApiConfig.post(
+    //     '/api/customers/${ctx["customerId"]}/boxes/${ctx["boxId"]}/activate',
+    //     payload,
+    //   );
+
     try {
       final payload = {
         "period": ctx["period"],
+        "useWallet": ctx["useWallet"],
+
+        // Razorpay fields (current flow)
         "paymentId": response.paymentId,
         "orderId": response.orderId,
         "signature": response.signature,
-        "useWallet": ctx["useWallet"],
-      };
 
-      // final apiRes = await ApiConfig.post(
-      //   '/api/customers/${ctx["customerId"]}/boxes/${ctx["boxId"]}/activate',
-      //   payload,
-      // );
-      //
-      // if (!mounted) return;
-      //
-      // final statusCode = apiRes['statusCode'] as int? ?? 500;
+        // Future-proof (PhonePe compatibility)
+        "merchantTransactionId": response.orderId,
+        // ^ this maps cleanly to your receipt format backend-side
+      };
 
       final apiRes = await ApiConfig.post(
         '/api/customers/${ctx["customerId"]}/boxes/${ctx["boxId"]}/activate',
@@ -551,7 +610,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       if (!mounted) return;
 
       final statusCode = apiRes['statusCode'] as int? ?? 500;
-
 
       if (statusCode == 200) {
         ScaffoldMessenger.of(
@@ -582,7 +640,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       }
       _pendingPaymentContext = null;
     }
-
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
@@ -598,13 +655,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       }
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Payment cancelled")),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Payment cancelled")));
 
     _pendingPaymentContext = null;
   }
-
 
   // small helper used inside dialog
   Widget _rowLabelValue(String label, String value, {TextStyle? valueStyle}) {
@@ -1032,7 +1088,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 _useWalletForBox[idStr] = false;
               }
 
-
               final useWallet = _useWalletForBox[idStr] == true;
 
               // wallet that will actually be applied (used for payment)
@@ -1320,7 +1375,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final walletText = _cardWalletLoading
         ? '...'
         : _formatWallet(_cardWalletPaise);
-
 
     // central styles
     final titleStyle = const TextStyle(
@@ -1639,7 +1693,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         foregroundColor: Colors.black,
         centerTitle: true,
         title: const Text(
-          'Cable Pay',
+          'Cable Smart Pay',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -1685,7 +1739,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       color: Colors.red,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
                     child: Text(
                       '$_unreadNotificationCount',
                       style: const TextStyle(
@@ -1699,7 +1756,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
             ],
           ),
-
 
           // ---- NEW: Profile navigation button ----
           IconButton(

@@ -51,9 +51,9 @@ class CustomerLegalText {
   static const terms = '''
 TERMS & CONDITIONS – CUSTOMERS
 
-CablePay is a digital billing and payment platform operated by Hurryep Technologies Private Limited.
+CableSmartPay is a digital billing and payment platform operated by Hurryep Technologies Private Limited.
 
-• CablePay does NOT provide cable TV services.
+• CableSmartPay does NOT provide cable TV services.
 • Service delivery is the responsibility of your local cable operator.
 • Payments are processed via RBI-compliant gateways.
 • Wallet balance is non-transferable and non-withdrawable.
@@ -61,7 +61,7 @@ CablePay is a digital billing and payment platform operated by Hurryep Technolog
 • Continued use implies acceptance of updated terms.
 
 Jurisdiction: India
-Support: cablepay@hurryep.com
+Support: CableSmartPay@hurryep.com
 ''';
 
   static const privacy = '''
@@ -89,7 +89,7 @@ class LcoLegalText {
   static const terms = '''
 TERMS & CONDITIONS – LCO
 
-CablePay provides billing and settlement tools to LCOs.
+CableSmartPay provides billing and settlement tools to LCOs.
 
 • LCOs control pricing and service delivery.
 • Platform fees apply as agreed.

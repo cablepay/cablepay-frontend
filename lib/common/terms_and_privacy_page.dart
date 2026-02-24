@@ -116,14 +116,14 @@ TERMS & CONDITIONS
 
 Last Updated: ${_today}
 
-1. About CablePay
-CablePay is a digital billing, payment, and settlement platform operated by Hurryep Technologies Private Limited (“Company”, “we”, “us”). CablePay enables customers to pay cable TV subscription charges and enables Local Cable Operators (LCOs) to manage billing records. CablePay does NOT provide cable television services.
+1. About Cable Smart Pay
+CableSmartPay is a digital billing, payment, and settlement platform operated by Hurryep Technologies Private Limited (“Company”, “we”, “us”). CableSmartPay enables customers to pay cable TV subscription charges and enables Local Cable Operators (LCOs) to manage billing records. CableSmartPay does NOT provide cable television services.
 
 2. Eligibility
-The App is intended for users aged 18 years or above. By using CablePay, you confirm that you are legally eligible to enter into this agreement.
+The App is intended for users aged 18 years or above. By using CableSmartPay, you confirm that you are legally eligible to enter into this agreement.
 
-3. Role of CablePay
-CablePay acts only as a technology facilitator. All cable services, activations, service quality, maintenance, and disconnections are solely the responsibility of the respective cable operator. CablePay is not responsible for service outages, signal quality, or operator disputes.
+3. Role of CableSmartPay
+CableSmartPay acts only as a technology facilitator. All cable services, activations, service quality, maintenance, and disconnections are solely the responsibility of the respective cable operator. CableSmartPay is not responsible for service outages, signal quality, or operator disputes.
 
 4. Payments
 Payments are processed through RBI-compliant third-party payment gateways (including UPI). Payment success is provisional until backend verification and gateway settlement confirmation.
@@ -132,16 +132,16 @@ Payments are processed through RBI-compliant third-party payment gateways (inclu
 Successful payment does not guarantee immediate activation. Service activation is performed by the cable operator after verification of payment and internal processes.
 
 6. Wallet, Rewards & Referrals
-Wallet credits and referral rewards are promotional in nature, non-transferable, and cannot be withdrawn as cash. CablePay reserves the right to modify or revoke reward programs.
+Wallet credits and referral rewards are promotional in nature, non-transferable, and cannot be withdrawn as cash. CableSmartPay reserves the right to modify or revoke reward programs.
 
 7. Refunds
-Refunds, if applicable, are subject to payment gateway rules and operator policies. CablePay does not guarantee refunds for operator-related service issues.
+Refunds, if applicable, are subject to payment gateway rules and operator policies. CableSmartPay does not guarantee refunds for operator-related service issues.
 
 8. Suspension & Termination
-CablePay reserves the right to suspend or terminate access in cases of fraud, misuse, regulatory violations, or breach of these terms.
+CableSmartPay reserves the right to suspend or terminate access in cases of fraud, misuse, regulatory violations, or breach of these terms.
 
 9. Limitation of Liability
-CablePay shall not be liable for indirect, incidental, or consequential damages including service interruptions, delayed activations, or disputes between customers and operators.
+CableSmartPay shall not be liable for indirect, incidental, or consequential damages including service interruptions, delayed activations, or disputes between customers and operators.
 
 10. Changes to Terms
 These Terms may be updated periodically. Continued use of the App constitutes acceptance of revised Terms.
@@ -150,7 +150,7 @@ These Terms may be updated periodically. Continued use of the App constitutes ac
 PRIVACY POLICY
 
 1. Introduction
-CablePay (www.cablepay.com), operated by Hurryep Technologies Private Limited, is committed to protecting your privacy and personal information. By using the App, you consent to the collection and use of information as described below.
+CableSmartPay (www.CableSmartPay.com), operated by Hurryep Technologies Private Limited, is committed to protecting your privacy and personal information. By using the App, you consent to the collection and use of information as described below.
 
 2. Information We Collect
 We may collect:
@@ -173,7 +173,7 @@ Information is collected solely to:
 • Improve service quality
 
 5. Payment Security
-All financial transactions are securely processed via encrypted, authorized third-party payment gateways. CablePay does not store sensitive payment credentials.
+All financial transactions are securely processed via encrypted, authorized third-party payment gateways. CableSmartPay does not store sensitive payment credentials.
 
 6. Cookies & Tracking
 We may use cookies or similar technologies for authentication, analytics, and service improvement. You may restrict cookies via device or browser settings, but some features may be affected.
@@ -192,19 +192,19 @@ Personal data is retained only as long as required for operational, legal, accou
 Users may request access, correction, or deletion of personal data by contacting support.
 
 10. External Links
-The App may contain links to third-party websites. CablePay is not responsible for third-party privacy practices.
+The App may contain links to third-party websites. CableSmartPay is not responsible for third-party privacy practices.
 
 11. Security
 Industry-standard technical and organizational safeguards are implemented. However, no system is completely secure, and users accept inherent risks.
 
 12. Grievance Redressal
 For privacy or data concerns, contact:
-Email: cablepay@hurryep.com  
+Email: CableSmartPay@hurryep.com  
 Grievances will be addressed within legally prescribed timelines.
 
 13. Jurisdiction & Dispute Resolution
 This policy is governed by Indian law. Disputes shall follow mediation and arbitration procedures. Courts in India shall have jurisdiction.
 
-By using CablePay, you acknowledge that you have read, understood, and agreed to these Terms & Privacy Policy.
+By using CableSmartPay, you acknowledge that you have read, understood, and agreed to these Terms & Privacy Policy.
 ''';
 

@@ -402,7 +402,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
         ),
         const SizedBox(height: 14),
         Text(
-          'Cable Pay',
+          'Cable Smart Pay',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w900,
