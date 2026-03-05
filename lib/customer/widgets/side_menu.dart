@@ -287,6 +287,32 @@ class SideMenu extends StatelessWidget {
                       Expanded(
                         child: TextButton.icon(
                           onPressed: () async {
+
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (ctx) {
+                                return AlertDialog(
+                                  title: const Text('Confirm Logout'),
+                                  content: const Text('Are you sure you want to logout?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(ctx).pop(false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.redAccent,
+                                      ),
+                                      onPressed: () => Navigator.of(ctx).pop(true),
+                                      child: const Text('Logout'),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+
+                            if (confirm != true) return;
                             // 1️⃣ Close drawer
                             Navigator.of(context).pop();
 

@@ -1,5 +1,6 @@
 // lib/customer/pages/profile_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../services/customer_service.dart';
 
@@ -22,6 +23,24 @@ class _ProfilePageState extends State<ProfilePage> {
   late TextEditingController _districtController;
   late TextEditingController _pincodeController;
 
+  Future<void> _loadCustomer() async {
+    final customerId = widget.customer['_id'] ?? widget.customer['id'];
+    if (customerId == null) return;
+
+    final res = await CustomerService.getCustomer(customerId.toString());
+
+    if (res['statusCode'] == 200 && res['data'] != null) {
+      final fresh = Map<String, dynamic>.from(res['data']);
+
+      setState(() {
+        widget.customer.addAll(fresh);
+        _nameController.text = fresh['name'] ?? '';
+        _districtController.text = fresh['district'] ?? '';
+        _pincodeController.text = fresh['pincode'] ?? '';
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +50,8 @@ class _ProfilePageState extends State<ProfilePage> {
     _emailController = TextEditingController(text: (c['email'] ?? '').toString());
     _districtController = TextEditingController(text: (c['district'] ?? '').toString());
     _pincodeController = TextEditingController(text: (c['pincode'] ?? '').toString());
+
+    _loadCustomer();   // 🔥 THIS WAS MISSING
   }
 
   @override
@@ -142,6 +163,24 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+
+  String? validateName(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'Required';
+    if (!RegExp(r'^[A-Za-z ]+$').hasMatch(t)) {
+      return 'Only letters and spaces allowed';
+    }
+    return null;
+  }
+
+  String? validatePincode(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'Required';
+    if (!RegExp(r'^\d{4,6}$').hasMatch(t)) return 'Invalid pincode';
+    return null;
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final name = _nameController.text.trim().isEmpty ? '-' : _nameController.text.trim();
@@ -206,10 +245,14 @@ class _ProfilePageState extends State<ProfilePage> {
                     enabled: _editing && !_saving,
                     decoration: _inputDecoration(label: 'Full name', icon: Icons.person),
                     style: const TextStyle(color: AppTheme.text),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Please enter name';
-                      return null;
-                    },
+                    // validator: (v) {
+                    //   if (v == null || v.trim().isEmpty) return 'Please enter name';
+                    //   return null;
+                    // },
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z ]')),
+                    ],
+                    validator: validateName,
                   ),
                   const SizedBox(height: 12),
 
@@ -246,6 +289,10 @@ class _ProfilePageState extends State<ProfilePage> {
                           enabled: _editing && !_saving,
                           decoration: _inputDecoration(label: 'District', icon: Icons.location_city),
                           style: const TextStyle(color: AppTheme.text),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z ]')),
+                          ],
+                          validator: validateName,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -257,12 +304,10 @@ class _ProfilePageState extends State<ProfilePage> {
                           decoration: _inputDecoration(label: 'Pincode', icon: Icons.pin_drop),
                           keyboardType: TextInputType.number,
                           style: const TextStyle(color: AppTheme.text),
-                          validator: (v) {
-                            final t = (v ?? '').trim();
-                            if (t.isEmpty) return null;
-                            if (!RegExp(r'^\d{4,6}$').hasMatch(t)) return 'Invalid';
-                            return null;
-                          },
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          validator: validatePincode,
                         ),
                       ),
                     ],

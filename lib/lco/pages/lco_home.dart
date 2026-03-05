@@ -28,6 +28,7 @@ class _LcoHomePageState extends State<LcoHomePage> {
   bool loading = true;
   bool statsLoading = true;
   bool financeLoading = true;
+  bool _isOffline = false;
 
   final Map<int, bool> _selected = {};
   final currencyFormat = NumberFormat.decimalPattern();
@@ -35,7 +36,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
 
   int _unreadNotificationCount = 0;
   bool _loadingUnread = false;
-
 
   String get _overviewMonthLabel {
     final dt = _overviewMonth ?? DateTime.now();
@@ -54,29 +54,37 @@ class _LcoHomePageState extends State<LcoHomePage> {
 
     final now = DateTime.now();
     final isCurrentMonth =
-        _overviewMonth!.year == now.year &&
-            _overviewMonth!.month == now.month;
+        _overviewMonth!.year == now.year && _overviewMonth!.month == now.month;
 
     return isCurrentMonth ? null : _overviewPeriodKey;
   }
-
 
   Future<void> _loadAll() async {
     setState(() {
       loading = true;
       statsLoading = true;
       financeLoading = true;
+      _isOffline = false;
     });
 
     // If user has picked a month, always use that period.
     // Otherwise let backend use current month by passing null.
     final String? period = _resolvePeriodForApi();
 
-    await Future.wait([
-      _loadLco(),
-      _loadStats(period: period),
-      _loadFinancials(period: period),
-    ]);
+    try {
+      await Future.wait([
+        _loadLco(),
+        _loadStats(period: period),
+        _loadFinancials(period: period),
+      ]);
+    } catch (e) {
+      // If any API throws network error, mark offline
+      if (mounted) {
+        setState(() {
+          _isOffline = true;
+        });
+      }
+    }
 
     if (!mounted) return;
     setState(() {
@@ -104,7 +112,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
       _loadingUnread = false;
     }
   }
-
 
   Future<void> _loadLco() async {
     final id = widget.lco['_id'] ?? widget.lco['id'];
@@ -166,7 +173,11 @@ class _LcoHomePageState extends State<LcoHomePage> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => stats = null);
+      setState(() {
+        stats = null;
+        _isOffline = true;
+      });
+      rethrow; // important
     } finally {
       if (!mounted) return;
       setState(() => statsLoading = false);
@@ -201,7 +212,11 @@ class _LcoHomePageState extends State<LcoHomePage> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => financials = null);
+      setState(() {
+        financials = null;
+        _isOffline = true;
+      });
+      rethrow; // important
     } finally {
       if (!mounted) return;
       setState(() => financeLoading = false);
@@ -418,7 +433,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
     }
   }
 
-
   void _showSelectedNetworksDialog() {
     final networks = _getNetworks();
     final chosen = <Map<String, dynamic>>[];
@@ -496,21 +510,16 @@ class _LcoHomePageState extends State<LcoHomePage> {
     // final num totalAmt = _num(
     //     financials?['overall']?['totalAmountRupees']
     // );
-    final num totalAmt =
-    _num(stats?['financials']?['totalAmountRupees']);
-
-
+    final num totalAmt = _num(stats?['financials']?['totalAmountRupees']);
 
     final num paidAmt = _num(
-        periodFin['incomeRupees'] ??
-            financials?['overall']?['paidAmountRupees']
+      periodFin['incomeRupees'] ?? financials?['overall']?['paidAmountRupees'],
     );
 
     final num notPaidAmt = _num(
-        periodFin['remainingRupees'] ??
-            financials?['overall']?['notPaidAmountRupees']
+      periodFin['remainingRupees'] ??
+          financials?['overall']?['notPaidAmountRupees'],
     );
-
 
     // ---------- 2. Per-period customer summary ----------
     final periodKey = _overviewPeriodKey;
@@ -531,9 +540,7 @@ class _LcoHomePageState extends State<LcoHomePage> {
       }
     }
 
-
     // ---------- 3. Overall stats (new / referred) ----------
-
 
     // // NEW / REFERRED must be period-aware
     // int newCust = 0;
@@ -548,8 +555,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
     //     }
     //   }
     // }
-
-
 
     // final overallStatsDyn = stats?['overall'];
     // final Map<String, dynamic> overallStats = (overallStatsDyn is Map)
@@ -573,13 +578,11 @@ class _LcoHomePageState extends State<LcoHomePage> {
     final overallStats = stats?['overall'] as Map<String, dynamic>? ?? {};
 
     final int totalCust = _int(overallStats['totalCustomers']);
-    final int paidCust  = _int(overallStats['paidCustomers']);
+    final int paidCust = _int(overallStats['paidCustomers']);
     final int notPaidCust = totalCust - paidCust;
-
 
     final int newCust = _int(overallStats['newCustomers']);
     final int referredCust = _int(overallStats['referredCustomers']);
-
 
     // final int newCust = _int(overallStats['newCustomers']);
     // final int referredCust = _int(overallStats['referredCustomers']);
@@ -2077,7 +2080,10 @@ class _LcoHomePageState extends State<LcoHomePage> {
                       color: Colors.red,
                       shape: BoxShape.circle,
                     ),
-                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
                     child: Text(
                       '$_unreadNotificationCount',
                       style: const TextStyle(
@@ -2092,320 +2098,371 @@ class _LcoHomePageState extends State<LcoHomePage> {
             ],
           ),
 
-
           const SizedBox(width: 6),
         ],
       ),
 
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await _loadAll();
-          await _loadUnreadNotifications();
-        },
-
-        color: AppTheme.primary,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxContentWidth),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14.0,
-                vertical: 12.0,
-              ),
-              child: loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView(
-                      children: [
-                        // ───────── LCO header card ─────────
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(18),
-                            gradient: LinearGradient(
-                              colors: [AppTheme.primary, AppTheme.primaryLight],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primary.withOpacity(0.20),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8),
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () async {
+              await _loadAll();
+              await _loadUnreadNotifications();
+            },
+            color: AppTheme.primary,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxContentWidth),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14.0,
+                    vertical: 12.0,
+                  ),
+                  child: loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ListView(
+                          children: [
+                            // existing content unchanged
+                            // ───────── LCO header card ─────────
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(18),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppTheme.primary,
+                                    AppTheme.primaryLight,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.primary.withOpacity(0.20),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // LEFT COLUMN: LCO details (takes remaining space)
-                                  Expanded(
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 26,
-                                          backgroundColor: Colors.white
-                                              .withOpacity(0.16),
-                                          child: Text(
-                                            avatarInitial,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 20,
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // LEFT COLUMN: LCO details (takes remaining space)
+                                      Expanded(
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 26,
+                                              backgroundColor: Colors.white
+                                                  .withOpacity(0.16),
+                                              child: Text(
+                                                avatarInitial,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 20,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    displayName.isNotEmpty
+                                                        ? displayName
+                                                        : '-',
+                                                    style: const TextStyle(
+                                                      fontSize: 17,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color: Colors.white,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    (lcoDetails?['businessName'] ??
+                                                                titleName)
+                                                            .toString()
+                                                            .trim()
+                                                            .isNotEmpty
+                                                        ? (lcoDetails?['businessName'] ??
+                                                                  titleName)
+                                                              .toString()
+                                                        : '-',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: Colors.white
+                                                          .withOpacity(0.85),
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.phone,
+                                                        size: 14,
+                                                        color: Colors.white
+                                                            .withOpacity(0.85),
+                                                      ),
+                                                      const SizedBox(width: 6),
+                                                      Expanded(
+                                                        child: Text(
+                                                          phoneText,
+                                                          style: TextStyle(
+                                                            fontSize: 13,
+                                                            color: Colors.white
+                                                                .withOpacity(
+                                                                  0.9,
+                                                                ),
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+
+                                      const SizedBox(width: 8),
+
+                                      // RIGHT COLUMN: Settlement mini card (fixed max width, no flex)
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth:
+                                              150, // safe on mobile, prevents overflow
+                                        ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.16,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(
+                                                0.24,
+                                              ),
+                                              width: 0.7,
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
                                           child: Column(
                                             crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                                CrossAxisAlignment.end,
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Text(
-                                                displayName.isNotEmpty
-                                                    ? displayName
-                                                    : '-',
-                                                style: const TextStyle(
-                                                  fontSize: 17,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: Colors.white,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                (lcoDetails?['businessName'] ??
-                                                            titleName)
-                                                        .toString()
-                                                        .trim()
-                                                        .isNotEmpty
-                                                    ? (lcoDetails?['businessName'] ??
-                                                              titleName)
-                                                          .toString()
-                                                    : '-',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: Colors.white
-                                                      .withOpacity(0.85),
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 8),
+                                              // Row 1: icon + "Settlement"
                                               Row(
-                                                children: [
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: const [
                                                   Icon(
-                                                    Icons.phone,
+                                                    Icons
+                                                        .account_balance_wallet_rounded,
                                                     size: 14,
-                                                    color: Colors.white
-                                                        .withOpacity(0.85),
+                                                    color: Colors.white,
                                                   ),
-                                                  const SizedBox(width: 6),
-                                                  Expanded(
-                                                    child: Text(
-                                                      phoneText,
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                        color: Colors.white
-                                                            .withOpacity(0.9),
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    'Settlement',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Colors.white,
                                                     ),
                                                   ),
                                                 ],
                                               ),
+                                              const SizedBox(height: 2),
+
+                                              // Row 2: subtitle
+                                              const Text(
+                                                'payable to you',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w400,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+
+                                              // Row 3: Amount (auto-fits inside 150px)
+                                              FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: Text(
+                                                  '₹${currencyFormat.format(settlementAmount)}',
+                                                  style: const TextStyle(
+                                                    fontSize: 20,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.white,
+                                                    height: 1.1,
+                                                  ),
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
 
-                                  const SizedBox(width: 8),
+                                  const SizedBox(height: 6),
 
-                                  // RIGHT COLUMN: Settlement mini card (fixed max width, no flex)
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth:
-                                          150, // safe on mobile, prevents overflow
-                                    ),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.16),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.24),
-                                          width: 0.7,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          // Row 1: icon + "Settlement"
-                                          Row(
+                                  // ───── chips row: district, PIN ─────
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    children: [
+                                      if (district.isNotEmpty)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.12,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: Row(
                                             mainAxisSize: MainAxisSize.min,
-                                            children: const [
-                                              Icon(
-                                                Icons
-                                                    .account_balance_wallet_rounded,
+                                            children: [
+                                              const Icon(
+                                                Icons.location_on_outlined,
                                                 size: 14,
                                                 color: Colors.white,
                                               ),
-                                              SizedBox(width: 4),
+                                              const SizedBox(width: 6),
                                               Text(
-                                                'Settlement',
-                                                style: TextStyle(
+                                                district,
+                                                style: const TextStyle(
                                                   fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
+                                                  fontWeight: FontWeight.w500,
                                                   color: Colors.white,
                                                 ),
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 2),
-
-                                          // Row 2: subtitle
-                                          const Text(
-                                            'payable to you',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w400,
-                                              color: Colors.white,
+                                        ),
+                                      if (pincode.isNotEmpty)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.12,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
                                             ),
                                           ),
-                                          const SizedBox(height: 6),
-
-                                          // Row 3: Amount (auto-fits inside 150px)
-                                          FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            alignment: Alignment.centerRight,
-                                            child: Text(
-                                              '₹${currencyFormat.format(settlementAmount)}',
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w900,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons
+                                                    .markunread_mailbox_outlined,
+                                                size: 14,
                                                 color: Colors.white,
-                                                height: 1.1,
                                               ),
-                                            ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'PIN $pincode',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    ),
+                                        ),
+                                    ],
                                   ),
                                 ],
                               ),
+                            ),
 
-                              const SizedBox(height: 6),
+                            const SizedBox(height: 16),
 
-                              // ───── chips row: district, PIN ─────
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                children: [
-                                  if (district.isNotEmpty)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.location_on_outlined,
-                                            size: 14,
-                                            color: Colors.white,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            district,
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  if (pincode.isNotEmpty)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.markunread_mailbox_outlined,
-                                            size: 14,
-                                            color: Colors.white,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'PIN $pincode',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                ],
+                            _buildHeaderCard(maxContentWidth),
+                            const SizedBox(height: 14),
+
+                            _buildNetworksList(maxContentWidth),
+                            const SizedBox(height: 14),
+
+                            _buildNetworkFeeCard(maxContentWidth),
+                            const SizedBox(height: 14),
+
+                            _buildSettlementCard(maxContentWidth),
+                            const SizedBox(height: 12),
+
+                            const Text(
+                              'LCO dashboard: tap Manage to edit networks. Use per-network metrics above.',
+                              style: TextStyle(
+                                color: AppTheme.muted,
+                                fontSize: 12,
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 28),
+                          ],
                         ),
-
-                        const SizedBox(height: 16),
-
-                        _buildHeaderCard(maxContentWidth),
-                        const SizedBox(height: 14),
-
-                        _buildNetworksList(maxContentWidth),
-                        const SizedBox(height: 14),
-
-                        _buildNetworkFeeCard(maxContentWidth),
-                        const SizedBox(height: 14),
-
-                        _buildSettlementCard(maxContentWidth),
-                        const SizedBox(height: 12),
-
-                        const Text(
-                          'LCO dashboard: tap Manage to edit networks. Use per-network metrics above.',
-                          style: TextStyle(color: AppTheme.muted, fontSize: 12),
-                        ),
-                        const SizedBox(height: 28),
-                      ],
-                    ),
+                ),
+              ),
             ),
           ),
-        ),
+          if (_isOffline)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                color: Colors.red.shade700,
+                child: const Center(
+                  child: Text(
+                    'No internet connection',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

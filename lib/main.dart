@@ -1,5 +1,6 @@
 // lib/main.dart
 import 'package:cable_pay/lco/widgets/lco_bottom_navigation.dart';
+import 'package:cable_pay/services/customer_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import 'core/connectivity_guard.dart';
 import 'core/local_storage.dart';
 import 'core/api_config.dart';
 import 'core/local_session.dart'; // optional if you use it
+import 'customer/widgets/bottom_navigation.dart';
 import 'routes.dart';
 import 'lco/pages/lco_login.dart';
 import 'lco/pages/lco_home.dart';
@@ -63,9 +65,10 @@ class MyApp extends StatelessWidget {
       scaffoldMessengerKey: appMessengerKey,
       // Show splash first; splash will navigate to StartupRouter
       // home: const SplashScreen(),
-      home: ConnectivityGuard(
-        child: const SplashScreen(),
-      ),
+      // home: ConnectivityGuard(
+      //   child: const SplashScreen(),
+      // ),
+      home: const SplashScreen(),
       // Keep your route generator intact
       onGenerateRoute: AppRoutes.generateRoute,
     );
@@ -246,9 +249,20 @@ class _StartupRouterState extends State<StartupRouter> {
       if (_session != null && _session!['userType'] == 'lco') {
         final storedLco = await LocalStorage.getLco();
         if (storedLco != null) _lco = Map<String, dynamic>.from(storedLco);
-      } else if (_session != null && _session!['userType'] == 'customer') {
+      }
+      else if (_session != null && _session!['userType'] == 'customer') {
         final storedCustomer = await LocalStorage.getCustomer();
-        if (storedCustomer != null) _customer = Map<String, dynamic>.from(storedCustomer);
+
+        if (storedCustomer != null) {
+          _customer = Map<String, dynamic>.from(storedCustomer);
+        } else {
+          // 🔥 CRITICAL FIX:
+          // If no stored profile but session exists,
+          // fallback to session user object (if present)
+          if (_session!['user'] != null) {
+            _customer = Map<String, dynamic>.from(_session!['user']);
+          }
+        }
       }
     } catch (e) {
       if (e is ApiError) {
@@ -296,13 +310,53 @@ class _StartupRouterState extends State<StartupRouter> {
       }
     }
 
+    // if (userType == 'customer') {
+    //   if (_customer != null) {
+    //     return CustomerDetailPage(data: _customer);
+    //   } else {
+    //     return const CustomerLoginPage();
+    //   }
+    // }
     if (userType == 'customer') {
       if (_customer != null) {
         return CustomerDetailPage(data: _customer);
-      } else {
-        return const CustomerLoginPage();
       }
+
+      // If session exists but profile missing,
+      // DO NOT logout or redirect.
+      // Stay inside app and let home handle offline.
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
+
+    // if (userType == 'customer') {
+    //   if (_customer != null) {
+    //     return FutureBuilder<Map<String, dynamic>>(
+    //       future: CustomerService.listBoxes(
+    //         (_customer!['_id'] ?? _customer!['id']).toString(),
+    //       ),
+    //       builder: (context, snapshot) {
+    //         if (!snapshot.hasData) {
+    //           return const Scaffold(
+    //             body: Center(child: CircularProgressIndicator()),
+    //           );
+    //         }
+    //
+    //         final res = snapshot.data!;
+    //         if (res['statusCode'] == 200 &&
+    //             res['data'] is List &&
+    //             (res['data'] as List).isNotEmpty) {
+    //           return AppBottomNavigation(customer: _customer!);
+    //         }
+    //
+    //         return CustomerDetailPage(data: _customer);
+    //       },
+    //     );
+    //   }
+    //
+    //   return const CustomerLoginPage();
+    // }
 
     // Fallback
     return const CustomerLoginPage();

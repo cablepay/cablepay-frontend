@@ -390,13 +390,14 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                               TextFormField(
                                 controller: r.userNameCtrl,
                                 readOnly: r.isExisting && !r.isUserNameVisible,
-                                obscureText: false, // IMPORTANT
                                 decoration: _input(
                                   'User Name *',
                                   icon: Icons.person,
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      r.isUserNameVisible ? Icons.visibility : Icons.visibility_off,
+                                      r.isUserNameVisible
+                                          ? Icons.visibility
+                                          : Icons.visibility_off,
                                       size: 20,
                                       color: AppTheme.muted,
                                     ),
@@ -406,7 +407,6 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                                         return;
                                       }
 
-                                      // hide again
                                       if (r.isUserNameVisible) {
                                         setState(() {
                                           r.isUserNameVisible = false;
@@ -415,7 +415,6 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                                         return;
                                       }
 
-                                      // fetch from backend
                                       final lcoId = widget.lco['_id']?.toString();
                                       if (lcoId == null) return;
 
@@ -443,13 +442,15 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                               TextFormField(
                                 controller: r.passwordCtrl,
                                 readOnly: r.isExisting && !r.isPasswordVisible,
-                                obscureText: false, // IMPORTANT
+                                obscureText: !r.isPasswordVisible,
                                 decoration: _input(
                                   'Password *',
                                   icon: Icons.lock,
                                   suffixIcon: IconButton(
                                     icon: Icon(
-                                      r.isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                                      r.isPasswordVisible
+                                          ? Icons.visibility
+                                          : Icons.visibility_off,
                                       size: 20,
                                       color: AppTheme.muted,
                                     ),
@@ -459,6 +460,7 @@ class _LcoNetworksPageState extends State<LcoNetworksPage> {
                                         return;
                                       }
 
+                                      // If already visible → hide again
                                       if (r.isPasswordVisible) {
                                         setState(() {
                                           r.isPasswordVisible = false;

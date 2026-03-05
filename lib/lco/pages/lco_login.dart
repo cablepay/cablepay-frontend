@@ -361,33 +361,33 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
     return Column(
       children: [
         Container(
-          width: badgeDiameter + 20,
-          height: badgeDiameter + 20,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.primary,
-                AppTheme.primaryLight,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primary.withOpacity(0.25),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
+          // width: badgeDiameter + 20,
+          // height: badgeDiameter + 20,
+          // decoration: BoxDecoration(
+          //   shape: BoxShape.circle,
+          //   gradient: LinearGradient(
+          //     colors: [
+          //       AppTheme.primary,
+          //       AppTheme.primaryLight,
+          //     ],
+          //     begin: Alignment.topLeft,
+          //     end: Alignment.bottomRight,
+          //   ),
+          //   boxShadow: [
+          //     BoxShadow(
+          //       color: AppTheme.primary.withOpacity(0.25),
+          //       blurRadius: 16,
+          //       offset: const Offset(0, 6),
+          //     ),
+          //   ],
+          // ),
           child: Center(
             child: Container(
               width: badgeDiameter,
               height: badgeDiameter,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.surface,
+                color: Color(0xFF1B4683),
               ),
               clipBehavior: Clip.antiAlias,
               child: Padding(

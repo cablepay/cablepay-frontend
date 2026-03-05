@@ -44,12 +44,17 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
   }
 
   Future<void> _loadDefaultBox() async {
-    final customerId = widget.customer['_id'] ?? widget.customer['id'];
-    final res = await CustomerService.listBoxes(customerId.toString());
+    try {
+      final customerId = widget.customer['_id'] ?? widget.customer['id'];
+      final res = await CustomerService.listBoxes(customerId.toString());
 
-    final boxes = (res['data'] as List?) ?? [];
-    if (boxes.isNotEmpty) {
-      _selectedBoxId = boxes.first['_id'];
+      final boxes = (res['data'] as List?) ?? [];
+
+      if (boxes.isNotEmpty) {
+        _selectedBoxId = boxes.first['_id'];
+      }
+    } catch (_) {
+      // Do not block UI if offline
     }
 
     if (mounted) {
@@ -247,7 +252,7 @@ class _SimpleNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = selected ? AppTheme.primary : AppTheme.primary;
+    final iconColor = selected ? AppTheme.primary : Colors.black87;
     final labelColor = selected ? AppTheme.primary : Colors.black87;
     return InkWell(
       onTap: onTap,

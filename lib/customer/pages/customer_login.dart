@@ -38,6 +38,7 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
 
 
 
+
   @override
   void dispose() {
     _otpTimer?.cancel();
@@ -339,33 +340,33 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
     return Column(
       children: [
         Container(
-          width: badgeDiameter + 20,
-          height: badgeDiameter + 20,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.primary,
-                AppTheme.primaryLight,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primary.withOpacity(0.25),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
+          // width: badgeDiameter + 20,
+          // height: badgeDiameter + 20,
+          // decoration: BoxDecoration(
+          //   shape: BoxShape.circle,
+          //   gradient: LinearGradient(
+          //     colors: [
+          //       AppTheme.primary,
+          //       AppTheme.primaryLight,
+          //     ],
+          //     begin: Alignment.topLeft,
+          //     end: Alignment.bottomRight,
+          //   ),
+          //   boxShadow: [
+          //     BoxShadow(
+          //       color: AppTheme.primary.withOpacity(0.25),
+          //       blurRadius: 16,
+          //       offset: const Offset(0, 6),
+          //     ),
+          //   ],
+          // ),
           child: Center(
             child: Container(
               width: badgeDiameter,
               height: badgeDiameter,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.surface,
+                color: Color(0xFF1B4683),
               ),
               clipBehavior: Clip.antiAlias,
               child: Padding(
@@ -430,8 +431,21 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
             hint: 'Enter your name',
             icon: Icons.person_outline,
             controller: _nameCtrl,
-            validator: (v) =>
-            v == null || v.trim().isEmpty ? 'Required' : null,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Required';
+
+              final trimmed = v.trim();
+
+              if (!RegExp(r'^[A-Za-z ]+$').hasMatch(trimmed)) {
+                return 'Only letters and spaces allowed';
+              }
+
+              if (trimmed.length < 2) {
+                return 'Name too short';
+              }
+
+              return null;
+            },
           ),
           const SizedBox(height: 14),
 

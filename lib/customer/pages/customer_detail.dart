@@ -256,6 +256,14 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
       return;
     }
 
+    // 🔴 IMAGE MANDATORY CHECK
+    if (_pickedImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Box barcode image is required'))
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
     final customerId = customer!['_id'] ?? customer!['id'] ?? customer!['uid'];
 
@@ -291,7 +299,19 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
         payload['pincode'] = _pincodeCtrl.text.trim();
       }
 
-      await CustomerService.updateCustomer(customerId.toString(), payload);
+      // await CustomerService.updateCustomer(customerId.toString(), payload);
+      final updateRes = await CustomerService.updateCustomer(
+        customerId.toString(),
+        payload,
+      );
+
+      if (updateRes['statusCode'] != 200) {
+        final msg = updateRes['data']?['error'] ?? 'Update failed';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg.toString())));
+        setState(() => _submitting = false);
+        return;
+      }
 
       // Pass XFile to createBox (service handles bytes for web & mobile)
       final res = await CustomerService.createBox(
@@ -393,6 +413,17 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
           if (v == null || v.trim().isEmpty) return '$label is required';
           if (type == TextInputType.phone && v.replaceAll(RegExp(r'\D'), '').length < 10) return 'Invalid phone number';
           if (label.toLowerCase().contains('pincode') && v.trim().length < 6) return 'Invalid pincode';
+          if (label.toLowerCase().contains('district')) {
+            if (!RegExp(r'^[A-Za-z .-]+$').hasMatch(v.trim())) {
+              return 'Invalid district name';
+            }
+          }
+
+          if (label.toLowerCase().contains('pincode')) {
+            if (!RegExp(r'^\d{6}$').hasMatch(v.trim())) {
+              return 'Pincode must be 6 digits';
+            }
+          }
           return null;
         },
         decoration: _inputDecoration(label: label, hint: hint),

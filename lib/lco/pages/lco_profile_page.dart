@@ -34,6 +34,23 @@ class _LcoProfilePageState extends State<LcoProfilePage> {
     }
   }
 
+
+  String? validateName(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'Required';
+    if (!RegExp(r'^[A-Za-z ]+$').hasMatch(t)) {
+      return 'Only letters and spaces allowed';
+    }
+    return null;
+  }
+
+  String? validatePincode(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'Required';
+    if (!RegExp(r'^\d{4,6}$').hasMatch(t)) return 'Invalid pincode';
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = _lco["name"]?.toString().trim() ?? "";
@@ -467,6 +484,7 @@ class _LcoEditPageState extends State<_LcoEditPage> {
               child: Form(
                 key: _formKey,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _inputField(
                       controller: _nameCtrl,
@@ -499,7 +517,7 @@ class _LcoEditPageState extends State<_LcoEditPage> {
                     //     return null;
                     //   },
                     // ),
-                    // const SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     _inputField(
                       controller: _phone1Ctrl,
                       label: "Phone 1",
@@ -511,16 +529,17 @@ class _LcoEditPageState extends State<_LcoEditPage> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     _inputField(
                       controller: _phone2Ctrl,
                       label: "Phone 2 (optional)",
                       icon: Icons.phone_outlined,
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
                     _section("Location"),
+                    const SizedBox(height: 12),
                     _inputField(
                       controller: _districtCtrl,
                       label: "District",
@@ -528,7 +547,7 @@ class _LcoEditPageState extends State<_LcoEditPage> {
                       validator: (v) =>
                       v!.trim().isEmpty ? "Required" : null,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     _inputField(
                       controller: _pincodeCtrl,
                       label: "Pincode",
@@ -551,8 +570,8 @@ class _LcoEditPageState extends State<_LcoEditPage> {
   }
 
   Widget _section(String title) {
-    return Align(
-      alignment: Alignment.centerLeft,
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
       child: Text(
         title,
         style: const TextStyle(
@@ -575,15 +594,48 @@ class _LcoEditPageState extends State<_LcoEditPage> {
       controller: controller,
       validator: validator,
       keyboardType: keyboardType,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
       decoration: InputDecoration(
         labelText: label,
+        floatingLabelBehavior: FloatingLabelBehavior.auto,
+
+        // 🔥 Proper spacing fix
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 16,
+        ),
+
         prefixIcon: icon != null
-            ? Icon(icon, color: AppTheme.muted, size: 20)
+            ? Padding(
+          padding: const EdgeInsets.only(left: 12, right: 8),
+          child: Icon(
+            icon,
+            color: AppTheme.muted,
+            size: 20,
+          ),
+        )
             : null,
+        prefixIconConstraints:
+        const BoxConstraints(minWidth: 40, minHeight: 40),
+
         filled: true,
         fillColor: AppTheme.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: AppTheme.divider),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: AppTheme.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.red),
         ),
       ),
     );

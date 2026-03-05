@@ -83,14 +83,22 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Future<void> _initPhonePe() async {
-    final ok = await PhonePePaymentSdk.init(
-      ApiConfig.phonepeEnv == 'PROD' ? 'PRODUCTION' : 'SANDBOX',
-      ApiConfig.phonepeMerchantId,
-      widget.customer['_id'].toString(), // flowId
-      false,
-    );
+    try {
+      final ok = await PhonePePaymentSdk.init(
+        ApiConfig.phonepeEnv == 'PROD' ? 'PRODUCTION' : 'SANDBOX',
+        ApiConfig.phonepeMerchantId,
+        widget.customer['_id'].toString(),
+        false,
+      );
 
-    debugPrint('PhonePe SDK init: $ok');
+      if (!ok) {
+        debugPrint("PhonePe SDK failed to initialize");
+      } else {
+        debugPrint("PhonePe SDK initialized successfully");
+      }
+    } catch (e) {
+      debugPrint("PhonePe init error: $e");
+    }
   }
 
   Future<void> _init() async {
@@ -141,10 +149,18 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       }
     } catch (e) {
       if (!mounted) return;
-      await safeSetState(this, () {
-        boxes = [];
-        errorMsg = 'Network error: $e';
-      });
+
+      // If network error, do NOT clear existing boxes
+      if (e.toString().contains('No internet') ||
+          e.toString().contains('network')) {
+        await safeSetState(this, () {
+          errorMsg = 'No internet connection';
+        });
+      } else {
+        await safeSetState(this, () {
+          errorMsg = 'Something went wrong';
+        });
+      }
     } finally {
       if (!mounted) return;
       setState(() => loading = false);
@@ -454,39 +470,115 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         return;
       }
 
-// 🔥 ADD THIS BLOCK (PhonePe handling)
-      final gateway = data['gateway']; // backend decides: 'razorpay' or 'phonepe'
+      // 🔥 ADD THIS BLOCK (PhonePe handling)
+      final gateway =
+          data['gateway']; // backend decides: 'razorpay' or 'phonepe'
+
+      // if (gateway == 'phonepe') {
+      //   final String request = jsonEncode({
+      //     "orderId": data['orderId'],        // from backend (PhonePe orderId)
+      //     "merchantId": data['merchantId'],  // from backend
+      //     "token": data['token'],            // from backend
+      //     "paymentMode": {"type": "PAY_PAGE"}
+      //     // "paymentMode": {
+      //     //   "type": "UPI_INTENT"
+      //     // }
+      //   });
+      //
+      //   // final result = await PhonePePaymentSdk.startTransaction(
+      //   //   request,
+      //   //   "yourappscheme", // iOS only (use your URL scheme), Android can pass ""
+      //   // );
+      //   final result = await PhonePePaymentSdk.startTransaction(
+      //     request,
+      //     "", // Android MUST be empty
+      //   );
+      //
+      //   final status = result?['status'];
+      //
+      //   if (status == 'SUCCESS') {
+      //     // ❗ Do NOT call /activate for PhonePe.
+      //     // Webhook will activate the box.
+      //     ScaffoldMessenger.of(context).showSnackBar(
+      //       const SnackBar(content: Text('Payment initiated. Please wait...')),
+      //     );
+      //
+      //     setState(() => activating[idStr] = false);
+      //     await _loadBoxes();
+      //     return;
+      //   } else {
+      //     throw Exception(result?['error'] ?? 'PhonePe payment failed');
+      //   }
+      // }
 
       if (gateway == 'phonepe') {
         final String request = jsonEncode({
-          "orderId": data['orderId'],        // from backend (PhonePe orderId)
-          "merchantId": data['merchantId'],  // from backend
-          "token": data['token'],            // from backend
-          "paymentMode": {"type": "PAY_PAGE"}
+          "orderId": data['orderId'],
+          "merchantId": data['merchantId'],
+          "token": data['token'],
+          "paymentMode": {"type": "PAY_PAGE"},
         });
 
-        final result = await PhonePePaymentSdk.startTransaction(
-          request,
-          "yourappscheme", // iOS only (use your URL scheme), Android can pass ""
-        );
+        Map<dynamic, dynamic>? result;
 
-        final status = result?['status'];
-
-        if (status == 'SUCCESS') {
-          // ❗ Do NOT call /activate for PhonePe.
-          // Webhook will activate the box.
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Payment initiated. Please wait...')),
-          );
-
+        try {
+          result = await PhonePePaymentSdk.startTransaction(request, "");
+        } catch (e) {
+          if (!mounted) return;
           setState(() => activating[idStr] = false);
-          await _loadBoxes();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Payment failed. Please try again.")),
+          );
           return;
-        } else {
-          throw Exception(result?['error'] ?? 'PhonePe payment failed');
+        }
+
+        final status = result?['status']?.toString().toUpperCase();
+
+        if (!mounted) return;
+
+        setState(() => activating[idStr] = false);
+
+        switch (status) {
+          case 'SUCCESS':
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Payment successful. Processing...'),
+              ),
+            );
+
+            // Webhook will activate
+            await _loadBoxes();
+            return;
+
+          case 'PENDING':
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Payment pending. Please wait.')),
+            );
+            return;
+
+          case 'FAILURE':
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Payment failed.')));
+            return;
+
+          case 'USER_CANCEL':
+          case 'CANCELLED':
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Payment cancelled.')));
+            return;
+
+          default:
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Payment failed. Please try again.'),
+              ),
+            );
+            return;
         }
       }
-
 
       // var options = {
       //   'key': data['key'],
@@ -526,15 +618,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                   },
                 ],
               },
-              'upi_collect': {
-                'name': 'Pay via UPI ID',
-                'instruments': [
-                  {
-                    'method': 'upi',
-                    'flows': ['collect'],
-                  },
-                ],
-              },
+              // 'upi_collect': {
+              //   'name': 'Pay via UPI ID',
+              //   'instruments': [
+              //     {
+              //       'method': 'upi',
+              //       'flows': ['collect'],
+              //     },
+              //   ],
+              // },
             },
             'sequence': ['block.upi_intent', 'block.upi_collect'],
             'preferences': {'show_default_blocks': false},
@@ -1278,7 +1370,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                                 ),
                               )
                             : Text(
-                                'Pay Now • ${_formatWallet(origPaise)}',
+                                // 'Pay Now • ${_formatWallet(origPaise)}',
+                                'Pay Now • ${_formatWallet(netToPay)}',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -1777,9 +1870,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: contentMaxWidth),
-          child: loading
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
+          // child: loading
+          //     ? const Center(child: CircularProgressIndicator())
+          child: Stack(
+            children: [
+               RefreshIndicator(
                   onRefresh: _loadBoxes,
                   color: _buttonBlue,
                   child: CustomScrollView(
@@ -1814,7 +1909,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       ),
 
                       // Content area: empty state or list of boxes
-                      if (boxes.isEmpty) ...[
+                      if (loading) ...[
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      ] else if (boxes.isEmpty) ...[
                         SliverFillRemaining(
                           hasScrollBody: false,
                           child: _buildEmpty(
@@ -1848,6 +1948,37 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     ],
                   ),
                 ),
+          _buildOfflineOverlay(),
+            ],
+        ),
+      ),
+      ),
+    );
+  }
+
+  Widget _buildOfflineOverlay() {
+    if (errorMsg == null || errorMsg != 'No internet connection') {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned.fill(
+      child: Container(
+        color: Colors.white.withOpacity(0.85),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.wifi_off, size: 60, color: Colors.red),
+              SizedBox(height: 12),
+              Text(
+                'No internet connection',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

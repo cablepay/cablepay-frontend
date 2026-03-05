@@ -88,27 +88,62 @@ class _SplashScreenState extends State<SplashScreen>
     return Scaffold(
       backgroundColor: _brandBlue,
       body: SafeArea(
-        child: Center(
-          child: FadeTransition(
-            opacity: _logoFade,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final shortestSide =
-                constraints.maxWidth < constraints.maxHeight
-                    ? constraints.maxWidth
-                    : constraints.maxHeight;
+        child: Stack(
+          children: [
+            // Centered logo (unchanged behavior)
+            Center(
+              child: FadeTransition(
+                opacity: _logoFade,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final shortestSide =
+                    constraints.maxWidth < constraints.maxHeight
+                        ? constraints.maxWidth
+                        : constraints.maxHeight;
 
-                final double logoSize = shortestSide * 0.6; // 80% of screen
+                    final double logoSize = shortestSide * 0.7;
 
-                return Image.asset(
-                  _assetPath,
-                  width: logoSize.clamp(180.0, 340.0), // sane limits
-                  height: logoSize.clamp(180.0, 340.0),
-                  fit: BoxFit.contain,
-                );
-              },
+                    return Image.asset(
+                      _assetPath,
+                      width: logoSize.clamp(180.0, 340.0),
+                      height: logoSize.clamp(180.0, 340.0),
+                      fit: BoxFit.contain,
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
+
+            // 👇 Powered by footer (NEW, non-intrusive)
+            Positioned(
+              bottom: 40, // 👈 move slightly up from bottom
+              left: 0,
+              right: 0,
+              child: Center(
+                child: RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontSize: 14, // 👈 slightly bigger font
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600, // 👈 a bit stronger weight
+                      letterSpacing: 0.4,
+                    ),
+                    children: const [
+                      TextSpan(text: 'Powered by Hurry'),
+                      TextSpan(
+                        text: 'e',
+                        style: TextStyle(
+                          color: Color(0xFF00C853), // green "e"
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextSpan(text: 'p'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
