@@ -1,5 +1,6 @@
 // lib/lco/pages/lco_detail.dart
 import 'package:flutter/material.dart';
+import '../../routes.dart';
 import '../../services/lco_service.dart';
 import '../../core/local_storage.dart';
 import 'lco_home.dart';
@@ -88,14 +89,22 @@ class _LcoDetailPageState extends State<LcoDetailPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('LCO profile saved')));
 
-        final networks = (updated['networks'] as List<dynamic>?) ?? [];
-        if (networks.isEmpty) {
-          // if no networks configured, guide user to networks screen
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LcoNetworksPage(lco: updated)));
-          return;
-        }
+        // final networks = (updated['networks'] as List<dynamic>?) ?? [];
+        // if (networks.isEmpty) {
+        //   // if no networks configured, guide user to networks screen
+        //   Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LcoNetworksPage(lco: updated)));
+        //   return;
+        // }
+        //
+        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LcoHomePage(lco: updated)));
+        //
 
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LcoHomePage(lco: updated)));
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.lcoPending,
+              (_) => false,
+        );
+
         return;
       } else {
         final msg = res['data'] is Map && res['data']['error'] != null ? res['data']['error'] : 'Save failed';
@@ -245,6 +254,7 @@ class _LcoDetailPageState extends State<LcoDetailPage> {
                           width: 120,
                           child: TextFormField(
                             controller: _pincodeCtrl,
+                            maxLength: 6,
                             decoration: _input('Pincode'),
                             keyboardType: TextInputType.number,
                             validator: (v) {

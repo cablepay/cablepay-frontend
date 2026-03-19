@@ -618,15 +618,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                   },
                 ],
               },
-              // 'upi_collect': {
-              //   'name': 'Pay via UPI ID',
-              //   'instruments': [
-              //     {
-              //       'method': 'upi',
-              //       'flows': ['collect'],
-              //     },
-              //   ],
-              // },
+              'upi_collect': {
+                'name': 'Pay via UPI ID',
+                'instruments': [
+                  {
+                    'method': 'upi',
+                    'flows': ['collect'],
+                  },
+                ],
+              },
             },
             'sequence': ['block.upi_intent', 'block.upi_collect'],
             'preferences': {'show_default_blocks': false},

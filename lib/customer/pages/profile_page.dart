@@ -22,6 +22,7 @@ class _ProfilePageState extends State<ProfilePage> {
   late TextEditingController _emailController;
   late TextEditingController _districtController;
   late TextEditingController _pincodeController;
+  late TextEditingController _addressController;
 
   Future<void> _loadCustomer() async {
     final customerId = widget.customer['_id'] ?? widget.customer['id'];
@@ -37,6 +38,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _nameController.text = fresh['name'] ?? '';
         _districtController.text = fresh['district'] ?? '';
         _pincodeController.text = fresh['pincode'] ?? '';
+        _addressController.text = fresh['address'] ?? '';
       });
     }
   }
@@ -50,6 +52,9 @@ class _ProfilePageState extends State<ProfilePage> {
     _emailController = TextEditingController(text: (c['email'] ?? '').toString());
     _districtController = TextEditingController(text: (c['district'] ?? '').toString());
     _pincodeController = TextEditingController(text: (c['pincode'] ?? '').toString());
+    _addressController = TextEditingController(
+      text: (c['address'] ?? '').toString(),
+    );
 
     _loadCustomer();   // 🔥 THIS WAS MISSING
   }
@@ -61,6 +66,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _emailController.dispose();
     _districtController.dispose();
     _pincodeController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -76,6 +82,9 @@ class _ProfilePageState extends State<ProfilePage> {
         'email': _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         'district': _districtController.text.trim().isEmpty ? null : _districtController.text.trim(),
         'pincode': _pincodeController.text.trim().isEmpty ? null : _pincodeController.text.trim(),
+        'address': _addressController.text.trim().isEmpty
+            ? null
+            : _addressController.text.trim(),
       };
 
       final res = await CustomerService.updateCustomer(customerId.toString(), payload);
@@ -88,6 +97,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _emailController.text = updated['email'] ?? _emailController.text;
         _districtController.text = updated['district'] ?? _districtController.text;
         _pincodeController.text = updated['pincode'] ?? _pincodeController.text;
+        _addressController.text = updated['address'] ?? _addressController.text;
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
@@ -313,6 +323,17 @@ class _ProfilePageState extends State<ProfilePage> {
                     ],
                   ),
                   const SizedBox(height: 20),
+
+                  TextFormField(
+                    controller: _addressController,
+                    enabled: _editing && !_saving,
+                    maxLines: 2,
+                    decoration: _inputDecoration(
+                      label: 'House No / Street / Area',
+                      icon: Icons.home,
+                    ),
+                    style: const TextStyle(color: AppTheme.text),
+                  ),
 
                   // Bottom action: prominent when not editing
                   if (!_editing)

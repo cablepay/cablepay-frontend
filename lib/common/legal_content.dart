@@ -5,19 +5,14 @@ class LegalPage extends StatelessWidget {
   final String title;
   final String content;
 
-  const LegalPage({
-    Key? key,
-    required this.title,
-    required this.content,
-  }) : super(key: key);
+  const LegalPage({Key? key, required this.title, required this.content})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackground,
-      appBar: AppBar(
-        title: Text(title),
-      ),
+      appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -45,43 +40,47 @@ class LegalPage extends StatelessWidget {
   }
 }
 
-
-
 class CustomerLegalText {
   static const terms = '''
 TERMS & CONDITIONS – CUSTOMERS
 
-CableSmartPay is a digital billing and payment platform operated by Hurryep Technologies Private Limited.
+CableSmartPay is a digital billing and payment facilitation platform operated by Hurryep Technologies Private Limited.
 
-• CableSmartPay does NOT provide cable TV services.
-• Service delivery is the responsibility of your local cable operator.
-• Payments are processed via RBI-compliant gateways.
-• Wallet balance is non-transferable and non-withdrawable.
-• Users must be 18 years or older.
-• Continued use implies acceptance of updated terms.
+• CableSmartPay does NOT provide cable television services.
+• All services, activations, and service quality are managed by the respective Local Cable Operator (LCO).
+• Payments are processed through RBI-authorized third-party payment gateways.
+• Successful payment is subject to gateway confirmation and backend verification.
+• Users must be at least 18 years of age to use this platform.
+• Misuse, fraudulent activity, or violation of these terms may result in account suspension.
+• Continued use of the platform constitutes acceptance of updated terms.
 
-Jurisdiction: India
-Support: CableSmartPay@hurryep.com
+Jurisdiction: India  
+Support: cablepay@hurryep.com
 ''';
 
   static const privacy = '''
 PRIVACY POLICY – CUSTOMERS
 
-We collect minimal personal data for service operation.
+CableSmartPay collects minimal personal information required to operate the service.
 
-Collected:
-• Name, phone number
-• Transaction references
-• Device metadata
+Information we collect:
+• Name and mobile number
+• Email address (if provided)
+• Transaction references and payment metadata
+• Device information (IP address, OS version, app version)
+• Push notification tokens for service alerts
 
-Not collected:
+Information we do NOT collect:
 • UPI PIN
 • Card CVV
-• Bank credentials
+• Bank login credentials
+• Sensitive authentication data
 
-Data is encrypted and never sold.
+Personal information is used only for authentication, billing, service notifications, and fraud prevention.
 
-Contact: privacy@hurryep.com
+We do not sell or rent personal data. Limited data may be shared with trusted service providers such as payment gateways and notification services.
+
+Support: cablepay@hurryep.com
 ''';
 }
 
@@ -89,27 +88,35 @@ class LcoLegalText {
   static const terms = '''
 TERMS & CONDITIONS – LCO
 
-CableSmartPay provides billing and settlement tools to LCOs.
+CableSmartPay provides billing management and payment facilitation tools for Local Cable Operators (LCOs).
 
-• LCOs control pricing and service delivery.
-• Platform fees apply as agreed.
-• Settlements depend on gateway timelines.
-• Misuse may lead to suspension.
+• LCOs are responsible for cable service delivery, pricing, and customer management.
+• CableSmartPay only provides the technology platform.
+• Platform service fees may apply as agreed.
+• Settlement timelines depend on payment gateway processing cycles.
+• Misuse, fraudulent activity, or violation of platform policies may lead to account suspension.
 
-Jurisdiction: India
-Support: lco-support@hurryep.com
+Jurisdiction: India  
+Support: cablepay@hurryep.com
 ''';
 
   static const privacy = '''
 PRIVACY POLICY – LCO
 
-We store LCO business and customer operational data.
+CableSmartPay stores operational data required for billing and settlement services.
 
-• Data is encrypted at rest and transit.
-• Access is role-restricted.
-• Data retained per Indian law.
+Information stored may include:
+• Business and contact information
+• Customer billing records
+• Transaction references
+• Device and access logs
 
-Contact: privacy@hurryep.com
+All sensitive data is encrypted in transit and at rest.
+
+Access to LCO data is restricted through role-based access controls.
+
+Data retention follows applicable Indian legal and regulatory requirements.
+
+Support: cablepay@hurryep.com
 ''';
 }
-

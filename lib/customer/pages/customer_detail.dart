@@ -29,6 +29,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   final TextEditingController _pincodeCtrl = TextEditingController();
   final TextEditingController _setupBoxCtrl = TextEditingController();
   final TextEditingController _vcCtrl = TextEditingController();
+  final TextEditingController _addressCtrl = TextEditingController();
 
   // State
   List<String> _availableNetworks = [];
@@ -60,8 +61,11 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
   void initState() {
     super.initState();
     customer = widget.data;
-    _nameCtrl = TextEditingController(text: customer != null ? (customer!['name'] ?? '') : '');
+
+    // _nameCtrl = TextEditingController(text: customer != null ? (customer!['name'] ?? '') : '');
+    _nameCtrl = TextEditingController();
     _phoneCtrl = TextEditingController(text: customer != null ? (customer!['phone'] ?? '') : '');
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndMaybeRedirect());
     _loadAvailableNetworks();
   }
@@ -74,6 +78,7 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
     _pincodeCtrl.dispose();
     _setupBoxCtrl.dispose();
     _vcCtrl.dispose();
+    _addressCtrl.dispose();
     super.dispose();
   }
 
@@ -290,6 +295,10 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
         'name': _nameCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
       };
+
+      if (_addressCtrl.text.trim().isNotEmpty) {
+        payload['address'] = _addressCtrl.text.trim();
+      }
 
       if (_districtCtrl.text.trim().isNotEmpty) {
         payload['district'] = _districtCtrl.text.trim();
@@ -608,6 +617,11 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                         const SizedBox(width: 12),
                         Expanded(child: _buildInput(controller: _pincodeCtrl, label: "Pincode", type: TextInputType.number, maxLength: 6, requiredField: false)),
                       ],
+                    ),
+                    _buildInput(
+                      controller: _addressCtrl,
+                      label: "House No / Street / Area",
+                      requiredField: false,
                     ),
 
                     Divider(color: _borderColor, height: 1),

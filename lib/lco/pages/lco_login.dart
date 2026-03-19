@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../services/push_notification_service.dart';
 import '../../widgets/loading_button.dart';
 import '../../widgets/simple_input.dart'; // still imported if used elsewhere
-import '../../widgets/label.dart';       // still imported if used elsewhere
+import '../../widgets/label.dart'; // still imported if used elsewhere
 import '../../services/lco_service.dart';
 import '../../core/local_storage.dart';
 import '../../core/api_config.dart';
@@ -40,7 +40,6 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
   Timer? _otpTimer;
   int _remainingSeconds = 300;
   bool _canResend = false;
-
 
   @override
   void initState() {
@@ -128,16 +127,12 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
       email: _emailCtrl.text,
     );
 
-
-
     if (!mounted) return;
     setState(() => _sending = false);
 
     if (res['statusCode'] != 200) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(res['data']?['error'] ?? 'Failed to send OTP'),
-        ),
+        SnackBar(content: Text(res['data']?['error'] ?? 'Failed to send OTP')),
       );
       return;
     }
@@ -145,10 +140,9 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
     setState(() => _otpSent = true);
     _startOtpTimer();
 
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('OTP sent')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('OTP sent')));
   }
 
   void _startOtpTimer() {
@@ -193,22 +187,21 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
 
     if (res['statusCode'] != 200) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res['data']?['error'] ?? 'Failed to resend OTP')),
+        SnackBar(
+          content: Text(res['data']?['error'] ?? 'Failed to resend OTP'),
+        ),
       );
       return;
     }
 
     _startOtpTimer();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('OTP resent')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('OTP resent')));
   }
 
-
-
   Future<void> _verifyAndLogin() async {
-
     if (_remainingSeconds <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('OTP expired. Please resend OTP')),
@@ -218,9 +211,9 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
 
     final otp = _otpCtrl.text.trim();
     if (otp.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter OTP')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter OTP')));
       return;
     }
 
@@ -246,7 +239,6 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
         email: _emailCtrl.text,
       );
 
-
       if (!mounted) return;
 
       setState(() => _verifying = false);
@@ -259,7 +251,6 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
         );
         return;
       }
-
 
       final payload = Map<String, dynamic>.from(res['data']);
       final session = Map<String, dynamic>.from(payload['session']);
@@ -279,25 +270,54 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
         }
       }());
 
+      // final profileComplete = payload['profileComplete'] == true;
+      //
+      // Navigator.pushNamedAndRemoveUntil(
+      //   context,
+      //   profileComplete ? AppRoutes.lcoHome : AppRoutes.lcoDetail,
+      //       (_) => false,
+      //   arguments: lco,
+      // );
 
       final profileComplete = payload['profileComplete'] == true;
+      final status = payload['status']?.toString();
 
+      if (!profileComplete) {
+        // First time login → complete profile
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.lcoDetail,
+          (_) => false,
+          arguments: lco,
+        );
+        return;
+      }
+
+      if (status != 'active') {
+        // Profile done but waiting for admin approval
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.lcoPending,
+          (_) => false,
+        );
+        return;
+      }
+
+      // Approved → open dashboard
       Navigator.pushNamedAndRemoveUntil(
         context,
-        profileComplete ? AppRoutes.lcoHome : AppRoutes.lcoDetail,
-            (_) => false,
+        AppRoutes.lcoHome,
+        (_) => false,
         arguments: lco,
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _verifying = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login error')));
     }
   }
-
-
 
   // --------------------------
   // MODERN UI HELPERS
@@ -345,8 +365,11 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
       maxLength: maxLength,
       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
       validator: validator,
-      decoration: _inputDecoration(label: label, hint: hint, icon: icon)
-          .copyWith(counterText: ''),
+      decoration: _inputDecoration(
+        label: label,
+        hint: hint,
+        icon: icon,
+      ).copyWith(counterText: ''),
     );
   }
 
@@ -355,8 +378,9 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
   // --------------------------
   Widget _buildTopBrand() {
     final double screenW = MediaQuery.of(context).size.width;
-    final double badgeDiameter =
-    screenW < 360 ? 86 : (screenW < 520 ? 104 : 120);
+    final double badgeDiameter = screenW < 360
+        ? 86
+        : (screenW < 520 ? 104 : 120);
 
     return Column(
       children: [
@@ -392,10 +416,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
               clipBehavior: Clip.antiAlias,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Image.asset(
-                  'assets/app_logo.png',
-                  fit: BoxFit.contain,
-                ),
+                child: Image.asset('assets/app_logo.png', fit: BoxFit.contain),
               ),
             ),
           ),
@@ -419,11 +440,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.cable_rounded,
-                size: 16,
-                color: AppTheme.primary,
-              ),
+              Icon(Icons.cable_rounded, size: 16, color: AppTheme.primary),
               const SizedBox(width: 6),
               Text(
                 'LCO Login / Dashboard',
@@ -457,8 +474,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
             hint: 'Enter your name',
             icon: Icons.person_outline,
             controller: _nameCtrl,
-            validator: (v) =>
-            v == null || v.trim().isEmpty ? 'Required' : null,
+            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
           ),
           const SizedBox(height: 14),
 
@@ -510,12 +526,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
 
           Row(
             children: [
-              Expanded(
-                child: Container(
-                  height: 1,
-                  color: AppTheme.divider,
-                ),
-              ),
+              Expanded(child: Container(height: 1, color: AppTheme.divider)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
@@ -526,12 +537,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
                   ),
                 ),
               ),
-              Expanded(
-                child: Container(
-                  height: 1,
-                  color: AppTheme.divider,
-                ),
-              ),
+              Expanded(child: Container(height: 1, color: AppTheme.divider)),
             ],
           ),
 
@@ -550,11 +556,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
                   context,
                   AppRoutes.customerLogin,
                 ),
-                icon: Icon(
-                  Icons.person,
-                  size: 16,
-                  color: AppTheme.primary,
-                ),
+                icon: Icon(Icons.person, size: 16, color: AppTheme.primary),
                 label: Text(
                   'Customer Login',
                   style: TextStyle(
@@ -563,8 +565,10 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
                   ),
                 ),
                 style: TextButton.styleFrom(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                 ),
               ),
             ],
@@ -592,10 +596,7 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
         Text(
           _phoneCtrl.text.trim(),
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
         const SizedBox(height: 20),
 
@@ -646,17 +647,14 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
         TextButton(
           onPressed: _canResend
               ? () {
-            _otpCtrl.clear();
-            _resendOtp();
-          }
+                  _otpCtrl.clear();
+                  _resendOtp();
+                }
               : null,
           child: Text(
-            _canResend
-                ? 'Resend OTP'
-                : 'Resend in $_remainingSeconds sec',
+            _canResend ? 'Resend OTP' : 'Resend in $_remainingSeconds sec',
           ),
         ),
-
 
         SizedBox(
           width: double.infinity,
@@ -692,8 +690,9 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
-    final double maxWidth =
-    (mq.size.width < 520) ? (mq.size.width - 28) : 520.0;
+    final double maxWidth = (mq.size.width < 520)
+        ? (mq.size.width - 28)
+        : 520.0;
 
     // While checking existing session, just show a minimal loader with theme BG
     if (_checkingExisting) {
@@ -712,14 +711,15 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
           child: Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: maxWidth),
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 18, vertical: 20),
+                  horizontal: 18,
+                  vertical: 20,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.surfaceVariant,
                   borderRadius: BorderRadius.circular(18),
@@ -740,7 +740,6 @@ class _LcoLoginPageState extends State<LcoLoginPage> {
     );
   }
 }
-
 
 class OtpSixBox extends StatefulWidget {
   final TextEditingController controller;
@@ -832,4 +831,3 @@ class _OtpSixBoxState extends State<OtpSixBox> {
     );
   }
 }
-

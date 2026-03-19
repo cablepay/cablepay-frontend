@@ -4,6 +4,7 @@ class CustomerModel {
   final String phone;
   final String? district;
   final String? pincode;
+  final String? address;
 
   CustomerModel({
     required this.id,
@@ -11,6 +12,7 @@ class CustomerModel {
     required this.phone,
     this.district,
     this.pincode,
+    this.address,
   });
 
   Map<String, dynamic> toMap() => {
@@ -19,6 +21,7 @@ class CustomerModel {
     'phone': phone,
     'district': district,
     'pincode': pincode,
+    'address': address,
   };
 
   static CustomerModel fromMap(Map<String, dynamic> m) => CustomerModel(
@@ -27,5 +30,6 @@ class CustomerModel {
     phone: m['phone'] ?? '',
     district: m['district'],
     pincode: m['pincode'],
+    address: m['address'],
   );
 }

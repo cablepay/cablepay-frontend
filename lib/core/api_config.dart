@@ -9,11 +9,11 @@ import 'api_error.dart';
 /// Simple, predictable ApiConfig modeled after your small example.
 /// - Web: http://localhost:<port>
 /// - Android emulator: http://10.0.2.2:<port>
-/// - Physical device / other: http://192.168.0.6:<port>
+/// - Physical device / other: http://192.168.0.23:<port>
 class ApiConfig {
   // ---------- Settings ----------
   static int port = 3000; // change as needed
-  static String lanIp = '192.168.0.6'; // your physical device / laptop IP
+  static String lanIp = '192.168.0.23'; // your physical device / laptop IP
 
   // optional manual overrides (useful when auto-detect fails)
   static String? _overrideHost;    // e.g. '10.0.2.2:5000' or 'localhost:5000'

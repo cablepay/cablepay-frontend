@@ -121,9 +121,15 @@ class _LcoChatPageState extends State<LcoChatPage> {
           // title: Text(_activeTicket == null
           //     ? 'Support Tickets'
           //     : 'Chat: ${_activeTicket!['networkCode']}'),
-          title: Text(_activeTicket == null
-              ? 'Support Tickets'
-              : 'Chat: ${_activeTicket!['customer']?['name'] ?? 'Customer'} (${_activeTicket!['customer']?['phone'] ?? '-'})'),
+          // title: Text(_activeTicket == null
+          //     ? 'Support Tickets'
+          //     : 'Chat: ${_activeTicket!['customer']?['name'] ?? 'Customer'} (${_activeTicket!['customer']?['phone'] ?? '-'})'),
+
+          title: Text(
+            _activeTicket == null
+                ? 'Support Tickets'
+                : _activeTicket!['customer']?['name'] ?? 'Customer',
+          ),
 
           actions: [
             if (_activeTicket == null)
@@ -195,13 +201,61 @@ class _LcoChatPageState extends State<LcoChatPage> {
     return Column(
       children: [
         // Ticket Info Header
+        // Container(
+        //   width: double.infinity,
+        //   padding: const EdgeInsets.all(12),
+        //   color: Colors.white,
+        //   child: Text(
+        //     "Subject: ${_activeTicket!['questionSnapshot']['title']}",
+        //     style: const TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w500),
+        //   ),
+        // ),
+
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           color: Colors.white,
-          child: Text(
-            "Subject: ${_activeTicket!['questionSnapshot']['title']}",
-            style: const TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w500),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              Text(
+                "Subject: ${_activeTicket!['questionSnapshot']['title']}",
+                style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w500),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                "Customer: ${_activeTicket!['customer']?['name'] ?? '-'}",
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+
+              Text(
+                "Phone: ${_activeTicket!['customer']?['phone'] ?? '-'}",
+              ),
+
+              Text(
+                "Address: ${_activeTicket!['customer']?['address'] ?? '-'}",
+              ),
+
+              Text(
+                "District: ${_activeTicket!['customer']?['district'] ?? '-'}",
+              ),
+
+              Text(
+                "Pincode: ${_activeTicket!['customer']?['pincode'] ?? '-'}",
+              ),
+
+              if (_activeTicket!['box'] != null)
+                Text(
+                  "STB: ${_activeTicket!['box']?['setupBoxNumber'] ?? '-'}",
+                ),
+
+            ],
           ),
         ),
 
@@ -258,24 +312,75 @@ class _LcoChatPageState extends State<LcoChatPage> {
           ),
           const SizedBox(width: 8),
           // Send Button
-          GestureDetector(
-            onTap: () => _sendReply(),
-            child: CircleAvatar(
-              backgroundColor: AppTheme.primary,
-              radius: 22,
-              child: const Icon(Icons.send, color: Colors.white, size: 20),
-            ),
+          // GestureDetector(
+          //   onTap: () => _sendReply(),
+          //   child: CircleAvatar(
+          //     backgroundColor: AppTheme.primary,
+          //     radius: 22,
+          //     child: const Icon(Icons.send, color: Colors.white, size: 20),
+          //   ),
+          // ),
+
+          Column(
+            children: [
+              GestureDetector(
+                onTap: () => _sendReply(),
+                child: CircleAvatar(
+                  backgroundColor: AppTheme.primary,
+                  radius: 22,
+                  child: const Icon(Icons.send, color: Colors.white, size: 20),
+                ),
+              ),
+              const SizedBox(height:4),
+              const Text("Reply",style:TextStyle(fontSize:10))
+            ],
           ),
+
           const SizedBox(width: 8),
           // Resolve Button
-          GestureDetector(
-            onTap: () => _sendReply(resolve: true),
-            child: const CircleAvatar(
-              backgroundColor: Colors.green,
-              radius: 22,
-              child: Icon(Icons.check, color: Colors.white, size: 20),
-            ),
+          // GestureDetector(
+          //   onTap: () => _sendReply(resolve: true),
+          //   child: const CircleAvatar(
+          //     backgroundColor: Colors.green,
+          //     radius: 22,
+          //     child: Icon(Icons.check, color: Colors.white, size: 20),
+          //   ),
+          // ),
+
+          Column(
+            children: [
+              GestureDetector(
+                // onTap: () => _sendReply(resolve: true),
+
+                onTap: () async {
+                  final confirm = await showDialog(
+                    context: context,
+                    builder: (c)=>AlertDialog(
+                      title: const Text("Resolve Ticket"),
+                      content: const Text("Mark this issue as resolved?"),
+                      actions:[
+                        TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text("Cancel")),
+                        TextButton(onPressed:()=>Navigator.pop(c,true),child:const Text("Resolve")),
+                      ],
+                    ),
+                  );
+
+                  if(confirm==true){
+                    _sendReply(resolve:true);
+                  }
+                },
+
+                child: const CircleAvatar(
+                  backgroundColor: Colors.green,
+                  radius: 22,
+                  child: Icon(Icons.check, color: Colors.white, size: 20),
+                ),
+              ),
+              const SizedBox(height:4),
+              const Text("Resolve",style:TextStyle(fontSize:10))
+            ],
           ),
+
         ],
       ),
     );

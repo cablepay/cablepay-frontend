@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../core/local_storage.dart';
 import '../../services/customer_service.dart';
 import '../../services/referral_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ReferralPage extends StatefulWidget {
   final Map<String, dynamic> customer;
@@ -95,7 +96,9 @@ class _ReferralPageState extends State<ReferralPage> {
   // compute counts from referrals list; fallback to customer flags if list empty
   int get _pendingCount {
     if (_referrals.isNotEmpty) {
-      return _referrals.where((r) => (r['status'] ?? 'pending').toString() == 'pending').length;
+      return _referrals
+          .where((r) => (r['status'] ?? 'pending').toString() == 'pending')
+          .length;
     }
     // fallback
     return _customer['referralPending'] == true ? 1 : 0;
@@ -103,13 +106,19 @@ class _ReferralPageState extends State<ReferralPage> {
 
   int get _completedCount {
     if (_referrals.isNotEmpty) {
-      return _referrals.where((r) => (r['status'] ?? '').toString() == 'completed').length;
+      return _referrals
+          .where((r) => (r['status'] ?? '').toString() == 'completed')
+          .length;
     }
     // fallback: if referralRewardIssued true, we cannot infer how many — return 1 if true
     return _customer['referralRewardIssued'] == true ? 1 : 0;
   }
 
-  Widget _infoTile({required String title, required String subtitle, IconData? leading}) {
+  Widget _infoTile({
+    required String title,
+    required String subtitle,
+    IconData? leading,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
       decoration: BoxDecoration(
@@ -123,12 +132,36 @@ class _ReferralPageState extends State<ReferralPage> {
             Icon(leading, size: 20, color: AppTheme.primary),
             const SizedBox(width: 12),
           ],
-          Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700))),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
           const SizedBox(width: 12),
           Text(subtitle, style: const TextStyle(color: AppTheme.muted)),
         ],
       ),
     );
+  }
+
+  void _shareReferral(String code) {
+    const playStore =
+        "https://play.google.com/store/apps/details?id=com.hurryep.cablepay";
+
+    final message =
+        """
+Join Cable Smart Pay!
+
+Recharge your cable TV easily.
+
+Use my referral code: $code
+
+Download the app:
+$playStore
+""";
+
+    Share.share(message);
   }
 
   Widget _buildReferralCard() {
@@ -137,78 +170,150 @@ class _ReferralPageState extends State<ReferralPage> {
     // inside _buildReferralCard()
     final points = _customer['rewardPoints'] ?? 0;
 
-// compute pending either from customer flag or from _referrals list
+    // compute pending either from customer flag or from _referrals list
     bool referralPendingFlag = _customer['referralPending'] == true;
-    bool hasPendingInList = _referrals.any((r) => (r['status'] ?? 'pending') == 'pending');
+    bool hasPendingInList = _referrals.any(
+      (r) => (r['status'] ?? 'pending') == 'pending',
+    );
     final referralPending = referralPendingFlag || hasPendingInList;
 
-// similarly for rewardIssued compute from either customer or referrals:
+    // similarly for rewardIssued compute from either customer or referrals:
     bool rewardIssuedFlag = _customer['referralRewardIssued'] == true;
-    bool hasCompletedInList = _referrals.any((r) => (r['status'] ?? '') == 'completed');
+    bool hasCompletedInList = _referrals.any(
+      (r) => (r['status'] ?? '') == 'completed',
+    );
     final rewardIssued = rewardIssuedFlag || hasCompletedInList;
-
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Share your code', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text(
+          'Share your code',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
         Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           elevation: 2,
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(children: [
-                  Expanded(child: Text('Your referral code', style: const TextStyle(fontWeight: FontWeight.w700))),
-                  const SizedBox(width: 8),
-                  SelectableText(myCode.toString(), style: const TextStyle(letterSpacing: 0.7, fontWeight: FontWeight.w600)),
-                ]),
-                const SizedBox(height: 10),
-                Text('Invite friends — when they complete their first payment, you earn reward points.', style: TextStyle(color: AppTheme.muted)),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.share),
-                      label: const Text('Share code'),
-                      onPressed: () {
-                        final code = myCode.toString();
-                        if (code == '-' || code.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No referral code available')));
-                          return;
-                        }
-                        Clipboard.setData(ClipboardData(text: code));
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code copied to clipboard')));
-                      },
-                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Your referral code',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton(
-                    onPressed: _loading ? null : _refreshCustomer,
-                    child: _loading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.refresh),
-                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14)),
-                  ),
-                ]),
+                    const SizedBox(width: 8),
+                    SelectableText(
+                      myCode.toString(),
+                      style: const TextStyle(
+                        letterSpacing: 0.7,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Invite friends — when they complete their first payment, you earn reward points.',
+                  style: TextStyle(color: AppTheme.muted),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.share),
+                        label: const Text('Share code'),
+                        onPressed: () {
+                          final code = myCode.toString();
+                          if (code == '-' || code.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('No referral code available'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          // Clipboard.setData(ClipboardData(text: code));
+                          // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral code copied to clipboard')));
+
+                          _shareReferral(code);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton(
+                      onPressed: _loading ? null : _refreshCustomer,
+                      child: _loading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: _infoTile(title: 'Reward points', subtitle: points.toString(), leading: Icons.stars)),
-          const SizedBox(width: 12),
-          Expanded(child: _infoTile(title: 'Pending referrals', subtitle: _pendingCount.toString(), leading: Icons.hourglass_top)),
-        ]),
+        Row(
+          children: [
+            Expanded(
+              child: _infoTile(
+                title: 'Reward points',
+                subtitle: points.toString(),
+                leading: Icons.stars,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _infoTile(
+                title: 'Pending referrals',
+                subtitle: _pendingCount.toString(),
+                leading: Icons.hourglass_top,
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
-        _infoTile(title: 'Completed referrals', subtitle: _completedCount.toString(), leading: Icons.check_circle_outline),
+        _infoTile(
+          title: 'Completed referrals',
+          subtitle: _completedCount.toString(),
+          leading: Icons.check_circle_outline,
+        ),
         if (rewardIssued)
           Padding(
             padding: const EdgeInsets.only(top: 10),
-            child: Text('You have received rewards for referrals.', style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.w600)),
+            child: Text(
+              'You have received rewards for referrals.',
+              style: TextStyle(
+                color: Colors.green[700],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
       ],
     );
@@ -218,37 +323,54 @@ class _ReferralPageState extends State<ReferralPage> {
     final referredBy = _customer['referredBy'];
     if (referredBy == null) return const SizedBox.shrink();
 
-    String referrerId = referredBy is Map && referredBy['_id'] != null ? (referredBy['_id'].toString()) : referredBy.toString();
+    String referrerId = referredBy is Map && referredBy['_id'] != null
+        ? (referredBy['_id'].toString())
+        : referredBy.toString();
     final referralPendingFlag = _customer['referralPending'] == true;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 8),
-        Text('You were referred by', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'You were referred by',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           elevation: 1,
           child: Padding(
             padding: const EdgeInsets.all(14),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const Icon(Icons.person_outline, size: 20),
-                const SizedBox(width: 10),
-                Expanded(child: Text(referrerId, style: const TextStyle(fontWeight: FontWeight.w700))),
-              ]),
-              const SizedBox(height: 10),
-              Text(
-                // rely on referrals list if present, otherwise on customer flag
-                (_referrals.isNotEmpty
-                    ? 'Your referrer will receive the reward when you make your first successful payment.'
-                    : (referralPendingFlag
-                    ? 'Your referrer will receive the reward after you make your first successful payment.'
-                    : 'Referral recorded.')),
-                style: TextStyle(color: AppTheme.muted),
-              ),
-            ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.person_outline, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        referrerId,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  // rely on referrals list if present, otherwise on customer flag
+                  (_referrals.isNotEmpty
+                      ? 'Your referrer will receive the reward when you make your first successful payment.'
+                      : (referralPendingFlag
+                            ? 'Your referrer will receive the reward after you make your first successful payment.'
+                            : 'Referral recorded.')),
+                  style: TextStyle(color: AppTheme.muted),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -257,7 +379,12 @@ class _ReferralPageState extends State<ReferralPage> {
 
   Widget _buildReferralsList() {
     if (_listLoading) {
-      return const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 12), child: CircularProgressIndicator()));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
 
     if (_referrals.isEmpty) {
@@ -265,18 +392,32 @@ class _ReferralPageState extends State<ReferralPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 12),
-          Text('People you referred', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'People you referred',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           Card(
             elevation: 1,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(14),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text('No referrals yet', style: const TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                Text('When someone signs up using your code, they appear here as pending until they make their first payment.', style: TextStyle(color: AppTheme.muted)),
-              ]),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'No referrals yet',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'When someone signs up using your code, they appear here as pending until they make their first payment.',
+                    style: TextStyle(color: AppTheme.muted),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -287,17 +428,30 @@ class _ReferralPageState extends State<ReferralPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 12),
-        Text('People you referred', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'People you referred',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         ..._referrals.map((r) {
           final status = (r['status'] ?? 'pending').toString();
-          final referredInfo = r['referredCustomer'] is Map ? Map<String, dynamic>.from(r['referredCustomer']) : null;
-          final displayName = referredInfo != null && (referredInfo['name'] ?? '').toString().isNotEmpty
+          final referredInfo = r['referredCustomer'] is Map
+              ? Map<String, dynamic>.from(r['referredCustomer'])
+              : null;
+          final displayName =
+              referredInfo != null &&
+                  (referredInfo['name'] ?? '').toString().isNotEmpty
               ? referredInfo['name'].toString()
               : (r['referredName'] ?? r['referred'] ?? 'Unknown').toString();
-          final phone = referredInfo != null ? (referredInfo['phone'] ?? '-') : (r['referredPhone'] ?? '-');
-          final createdAt = r['createdAt'] != null ? DateTime.tryParse(r['createdAt'].toString()) : null;
-          final completedAt = r['completedAt'] != null ? DateTime.tryParse(r['completedAt'].toString()) : null;
+          final phone = referredInfo != null
+              ? (referredInfo['phone'] ?? '-')
+              : (r['referredPhone'] ?? '-');
+          final createdAt = r['createdAt'] != null
+              ? DateTime.tryParse(r['createdAt'].toString())
+              : null;
+          final completedAt = r['completedAt'] != null
+              ? DateTime.tryParse(r['completedAt'].toString())
+              : null;
           final points = r['rewardPoints'] ?? r['points'] ?? '-';
 
           Color badgeColor = AppTheme.primary;
@@ -315,42 +469,99 @@ class _ReferralPageState extends State<ReferralPage> {
 
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             elevation: 1,
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppTheme.primary.withOpacity(0.12),
-                  child: Text(displayName.isNotEmpty ? displayName[0].toUpperCase() : '?', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w700)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(displayName, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 6),
-                    Text('Phone: ${phone ?? '-'}', style: TextStyle(color: AppTheme.muted)),
-                    const SizedBox(height: 6),
-                    Wrap(spacing: 8, runSpacing: 6, children: [
-                      Row(mainAxisSize: MainAxisSize.min, children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(color: badgeColor.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-                          child: Row(children: [
-                            Icon(badgeIcon, size: 14, color: badgeColor),
-                            const SizedBox(width: 6),
-                            Text(badgeText, style: TextStyle(color: badgeColor, fontWeight: FontWeight.w600)),
-                          ]),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: AppTheme.primary.withOpacity(0.12),
+                    child: Text(
+                      displayName.isNotEmpty
+                          ? displayName[0].toUpperCase()
+                          : '?',
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
-                      ]),
-                      if (completedAt != null) Text('Completed: ${_formatDate(completedAt)}', style: const TextStyle(color: AppTheme.muted)),
-                      if (createdAt != null) Text('Since: ${_formatDate(createdAt)}', style: const TextStyle(color: AppTheme.muted)),
-                      Text('Pts: $points', style: const TextStyle(color: AppTheme.muted)),
-                    ]),
-                  ]),
-                ),
-              ]),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Phone: ${phone ?? '-'}',
+                          style: TextStyle(color: AppTheme.muted),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: badgeColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        badgeIcon,
+                                        size: 14,
+                                        color: badgeColor,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        badgeText,
+                                        style: TextStyle(
+                                          color: badgeColor,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (completedAt != null)
+                              Text(
+                                'Completed: ${_formatDate(completedAt)}',
+                                style: const TextStyle(color: AppTheme.muted),
+                              ),
+                            if (createdAt != null)
+                              Text(
+                                'Since: ${_formatDate(createdAt)}',
+                                style: const TextStyle(color: AppTheme.muted),
+                              ),
+                            Text(
+                              'Pts: $points',
+                              style: const TextStyle(color: AppTheme.muted),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }).toList(),
@@ -381,14 +592,17 @@ class _ReferralPageState extends State<ReferralPage> {
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              _buildReferralCard(),
-              const SizedBox(height: 12),
-              _buildReferredBySection(),
-              const SizedBox(height: 12),
-              _buildReferralsList(),
-              const SizedBox(height: 40),
-            ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildReferralCard(),
+                const SizedBox(height: 12),
+                _buildReferredBySection(),
+                const SizedBox(height: 12),
+                _buildReferralsList(),
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         ),
       ),

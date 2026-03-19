@@ -426,28 +426,28 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
           const SizedBox(height: 26),
 
           // Name
-          _buildTextField(
-            label: 'Full Name',
-            hint: 'Enter your name',
-            icon: Icons.person_outline,
-            controller: _nameCtrl,
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Required';
-
-              final trimmed = v.trim();
-
-              if (!RegExp(r'^[A-Za-z ]+$').hasMatch(trimmed)) {
-                return 'Only letters and spaces allowed';
-              }
-
-              if (trimmed.length < 2) {
-                return 'Name too short';
-              }
-
-              return null;
-            },
-          ),
-          const SizedBox(height: 14),
+          // _buildTextField(
+          //   label: 'Full Name',
+          //   hint: 'Enter your name',
+          //   icon: Icons.person_outline,
+          //   controller: _nameCtrl,
+          //   validator: (v) {
+          //     if (v == null || v.trim().isEmpty) return 'Required';
+          //
+          //     final trimmed = v.trim();
+          //
+          //     if (!RegExp(r'^[A-Za-z ]+$').hasMatch(trimmed)) {
+          //       return 'Only letters and spaces allowed';
+          //     }
+          //
+          //     if (trimmed.length < 2) {
+          //       return 'Name too short';
+          //     }
+          //
+          //     return null;
+          //   },
+          // ),
+          // const SizedBox(height: 14),
 
           // Mobile
           _buildTextField(

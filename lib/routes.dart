@@ -9,12 +9,14 @@ import 'lco/pages/lco_home.dart';
 import 'lco/pages/lco_networks.dart';
 import 'lco/pages/lco_network_detail.dart';
 import 'lco/widgets/lco_bottom_navigation.dart';
+import 'lco/pages/lco_pending.dart';
 
 class AppRoutes {
   static const String customerLogin = '/customer/login';
   static const String customerDetail = '/customer/detail';
   static const String customerHistory = '/customer/history';
   static const String lcoLogin = '/lco/login';
+  static const lcoPending = '/lco/pending';
   static const String lcoHome = '/lco/home';
   static const String lcoDetail = '/lco/detail';
   static const String lcoNetworks = '/lco/networks';
@@ -34,6 +36,10 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => CustomerHistoryPage(customer: customer, boxId: boxId));
       case lcoLogin:
         return MaterialPageRoute(builder: (_) => const LcoLoginPage());
+      case lcoPending:
+        return MaterialPageRoute(
+          builder: (_) => const LcoPendingPage(),
+        );
       case lcoHome:
         final args = settings.arguments as Map<String, dynamic>? ?? {};
         final lco = Map<String, dynamic>.from(args);

@@ -13,6 +13,7 @@ import 'core/local_storage.dart';
 import 'core/api_config.dart';
 import 'core/local_session.dart'; // optional if you use it
 import 'customer/widgets/bottom_navigation.dart';
+import 'lco/pages/lco_pending.dart';
 import 'routes.dart';
 import 'lco/pages/lco_login.dart';
 import 'lco/pages/lco_home.dart';
@@ -246,9 +247,28 @@ class _StartupRouterState extends State<StartupRouter> {
 
 
       // restore profiles depending on session type
+      // if (_session != null && _session!['userType'] == 'lco') {
+      //   final storedLco = await LocalStorage.getLco();
+      //   if (storedLco != null) _lco = Map<String, dynamic>.from(storedLco);
+      // }
       if (_session != null && _session!['userType'] == 'lco') {
-        final storedLco = await LocalStorage.getLco();
-        if (storedLco != null) _lco = Map<String, dynamic>.from(storedLco);
+
+        final me = await ApiConfig.get('/api/lcos/me');
+
+        if (me['statusCode'] == 200) {
+
+          final lco = Map<String, dynamic>.from(me['body']);
+
+          _lco = lco;
+
+          await LocalStorage.saveLco(lco);
+
+        } else {
+
+          await LocalStorage.clearSession();
+
+          _session = null;
+        }
       }
       else if (_session != null && _session!['userType'] == 'customer') {
         final storedCustomer = await LocalStorage.getCustomer();
@@ -304,8 +324,15 @@ class _StartupRouterState extends State<StartupRouter> {
     final userType = (_session!['userType'] ?? '').toString();
     if (userType == 'lco') {
       if (_lco != null) {
+        final status = _lco!['status'];
+
+        if (status != 'active') {
+          return const LcoPendingPage();
+        }
+
         return LcoBottomNavigation(lco: _lco!);
-      } else {
+      }
+      else {
         return const LcoLoginPage();
       }
     }
