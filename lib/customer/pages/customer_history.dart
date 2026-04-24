@@ -550,7 +550,13 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
   Widget build(BuildContext context) {
     final title =
         widget.customer['name'] ?? widget.customer['phone'] ?? 'Customer';
-    final visibleBoxes = boxes;
+    final visibleBoxes = boxes.where((b) {
+      final isOwner = b['customer'] == widget.customer['_id'];
+      final isLinkedToMe = b['linkedCustomer'] == widget.customer['_id'];
+      final isRemoved = b['wasLinked'] == true;
+
+      return (isOwner || isLinkedToMe) && !isRemoved;
+    }).toList();
 
     return Scaffold(
       backgroundColor: _bgGrey,

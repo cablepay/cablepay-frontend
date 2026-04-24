@@ -15,7 +15,8 @@ class CallPage extends StatefulWidget {
 }
 
 class _CallPageState extends State<CallPage> {
-  static const String supportPhone = '1800123456';
+  // static const String supportPhone = '1800123456';
+  String? _supportPhone;
 
   bool _loading = true;
   String? _operatorPhone;
@@ -25,6 +26,7 @@ class _CallPageState extends State<CallPage> {
   void initState() {
     super.initState();
     _fetchOperatorPhone();
+    _fetchSupportPhone();
   }
 
   Future<void> _fetchOperatorPhone() async {
@@ -43,6 +45,23 @@ class _CallPageState extends State<CallPage> {
       _error = 'Failed to load operator contact';
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _fetchSupportPhone() async {
+    try {
+      final res = await ApiConfig.get('/api/config/support');
+
+      if (res['statusCode'] == 200 &&
+          res['body']?['supportPhone'] != null) {
+        _supportPhone = res['body']['supportPhone'].toString();
+      } else {
+        _supportPhone = null;
+      }
+    } catch (_) {
+      _supportPhone = null;
+    } finally {
+      if (mounted) setState(() {});
     }
   }
 
@@ -221,7 +240,7 @@ class _CallPageState extends State<CallPage> {
             _callRow(
               title: 'CablePay Support',
               subtitle: 'Central support team',
-              phone: supportPhone,
+              phone: _supportPhone,
             ),
 
             if (_error != null) ...[

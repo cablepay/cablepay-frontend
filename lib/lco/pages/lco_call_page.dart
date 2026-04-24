@@ -1,14 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/api_config.dart'; // ✅ IMPORTANT
 
-class LcoCallPage extends StatelessWidget {
-  /// 🔹 Single fixed number for LCO app (India toll-free)
-  static const String lcoSupportPhone = '1800123456';
-
+class LcoCallPage extends StatefulWidget {
   const LcoCallPage({Key? key}) : super(key: key);
 
+  @override
+  State<LcoCallPage> createState() => _LcoCallPageState();
+}
+
+class _LcoCallPageState extends State<LcoCallPage> {
+  String? _supportPhone;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSupportPhone();
+  }
+
+  Future<void> _fetchSupportPhone() async {
+    try {
+      final res = await ApiConfig.get('/api/config/support');
+
+      if (res['statusCode'] == 200 &&
+          res['body']?['supportPhone'] != null) {
+        _supportPhone = res['body']['supportPhone'].toString();
+      } else {
+        _supportPhone = null;
+      }
+    } catch (_) {
+      _supportPhone = null;
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   Future<void> _call(BuildContext context, String phone) async {
-    // Preserve +, allow India +91, 10-digit, toll-free
     final sanitized = phone.replaceAll(RegExp(r'[^\d+]'), '');
 
     if (sanitized.isEmpty) {
@@ -16,10 +44,7 @@ class LcoCallPage extends StatelessWidget {
       return;
     }
 
-    final uri = Uri(
-      scheme: 'tel',
-      path: sanitized,
-    );
+    final uri = Uri(scheme: 'tel', path: sanitized);
 
     try {
       final launched = await launchUrl(
@@ -45,11 +70,13 @@ class LcoCallPage extends StatelessWidget {
   }
 
   Widget _callRow({
-    required BuildContext context, // ✅ FIX
+    required BuildContext context,
     required String title,
     required String subtitle,
-    required String phone,
+    required String? phone,
   }) {
+    final isValid = phone != null && phone.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -66,52 +93,48 @@ class LcoCallPage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          /// LEFT CONTENT
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
+                Text(subtitle,
+                    style: TextStyle(
+                        fontSize: 13, color: Colors.grey.shade600)),
                 const SizedBox(height: 6),
                 Text(
-                  phone,
-                  style: const TextStyle(
+                  phone ?? 'Not available',
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    letterSpacing: 0.3,
+                    color: isValid
+                        ? Colors.black
+                        : Colors.grey.shade500,
                   ),
                 ),
               ],
             ),
           ),
 
-          /// RIGHT CALL BUTTON
           InkWell(
-            onTap: () => _call(context, phone),
+            onTap: isValid ? () => _call(context, phone!) : null,
             borderRadius: BorderRadius.circular(50),
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: isValid
+                    ? Colors.green.shade50
+                    : Colors.grey.shade200,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.call,
-                color: Colors.green.shade700,
+                color: isValid
+                    ? Colors.green.shade700
+                    : Colors.grey.shade500,
                 size: 22,
               ),
             ),
@@ -131,7 +154,9 @@ class LcoCallPage extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
@@ -151,12 +176,11 @@ class LcoCallPage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            /// 🔹 FIXED SUPPORT NUMBER
             _callRow(
-              context: context, // ✅ PASS CONTEXT
+              context: context,
               title: 'CablePay Support',
               subtitle: 'Central support team',
-              phone: lcoSupportPhone,
+              phone: _supportPhone,
             ),
           ],
         ),

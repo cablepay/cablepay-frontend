@@ -3,6 +3,7 @@ import 'package:cable_pay/customer/pages/wallet_page.dart';
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../core/logout_helper.dart';
+import '../pages/my_connections_page.dart';
 import '../pages/notification_page.dart';
 import '../pages/profile_page.dart';
 import 'bottom_navigation.dart';
@@ -236,6 +237,20 @@ class SideMenu extends StatelessWidget {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const NotificationPage()),
+                      );
+                    },
+                  ),
+                  _buildTile(
+                    context,
+                    icon: Icons.devices,
+                    label: 'My Connections',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MyConnectionsPage(customer: customer ?? {}),
+                        ),
                       );
                     },
                   ),

@@ -321,4 +321,60 @@ class LcoService {
     final status = res['statusCode'] as int? ?? 500;
     return {'statusCode': status, 'data': res['body']};
   }
+
+  static Future<Map<String, dynamic>> requestBankOtp() async {
+    final res = await ApiConfig.post('/api/lcos/resend-otp-bank', {});
+    return {'statusCode': res['statusCode'], 'data': res['body']};
+  }
+
+  static Future<Map<String, dynamic>> getBank(String lcoId) async {
+    final res = await ApiConfig.get('/api/lcos/$lcoId/bank');
+    return {'statusCode': res['statusCode'], 'data': res['body']};
+  }
+
+  static Future<Map<String, dynamic>> saveBank(
+      String lcoId,
+      Map<String, dynamic> body,
+      ) async {
+    final res = await ApiConfig.post('/api/lcos/$lcoId/bank', body);
+    return {'statusCode': res['statusCode'], 'data': res['body']};
+  }
+
+  static Future<Map<String, dynamic>> getAllCustomers(
+      String lcoId, {
+        String? networkCode,
+        String? status,
+        String? search,
+        String? period,
+      }) async {
+    final query = <String, String>{};
+
+    if (networkCode != null && networkCode.isNotEmpty) {
+      query['networkCode'] = networkCode;
+    }
+
+    if (status != null && status.isNotEmpty) {
+      query['status'] = status;
+    }
+
+    if (search != null && search.isNotEmpty) {
+      query['search'] = search;
+    }
+
+    if (period != null && period.isNotEmpty) {
+      query['period'] = period; // 🔥 CRITICAL
+    }
+
+    final uri = Uri.parse('/api/lcos/$lcoId/customers')
+        .replace(queryParameters: query);
+
+    final res = await ApiConfig.get(uri.toString());
+
+    return {
+      'statusCode': res['statusCode'],
+      'data': res['body'],
+    };
+  }
+
+
 }

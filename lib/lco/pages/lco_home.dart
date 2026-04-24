@@ -7,6 +7,7 @@ import '../../customer/pages/notification_page.dart';
 import '../../routes.dart';
 import '../../services/lco_service.dart';
 import '../../core/app_theme.dart';
+import 'lco_customers_page.dart';
 import 'lco_history.dart';
 import 'lco_network_detail.dart';
 import 'lco_networks.dart';
@@ -606,13 +607,12 @@ class _LcoHomePageState extends State<LcoHomePage> {
       required Color color,
       required IconData icon,
     }) {
-      return Expanded(
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-          ),
+      return Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
           child: isVeryCompact
               ? Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -682,7 +682,6 @@ class _LcoHomePageState extends State<LcoHomePage> {
                     ),
                   ],
                 ),
-        ),
       );
     }
 
@@ -768,25 +767,72 @@ class _LcoHomePageState extends State<LcoHomePage> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    statBox(
-                      label: 'Customers',
-                      value: '$totalCust',
-                      color: AppTheme.primary,
-                      icon: Icons.group,
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LcoCustomersPage(
+                                lco: widget.lco,
+                                initialPeriod: _resolvePeriodForApi(),
+                              ),
+                            ),
+                          );
+                        },
+                        child: statBox(
+                          label: 'Customers',
+                          value: '$totalCust',
+                          color: AppTheme.primary,
+                          icon: Icons.group,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    statBox(
-                      label: 'Paid',
-                      value: '$paidCust',
-                      color: Colors.green,
-                      icon: Icons.check_circle,
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LcoCustomersPage(
+                                lco: widget.lco,
+                                initialStatus: 'paid',
+                                initialPeriod: _resolvePeriodForApi(),
+                              ),
+                            ),
+                          );
+                        },
+                        child: statBox(
+                          label: 'Paid',
+                          value: '$paidCust',
+                          color: Colors.green,
+                          icon: Icons.check_circle,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    statBox(
-                      label: 'Not Paid',
-                      value: '$notPaidCust',
-                      color: Colors.redAccent,
-                      icon: Icons.error_outline,
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LcoCustomersPage(
+                                lco: widget.lco,
+                                initialStatus: 'unpaid',
+                                initialPeriod: _resolvePeriodForApi(),
+                              ),
+                            ),
+                          );
+                        },
+                        child: statBox(
+                          label: 'Not Paid',
+                          value: '$notPaidCust',
+                          color: Colors.redAccent,
+                          icon: Icons.error_outline,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -800,18 +846,50 @@ class _LcoHomePageState extends State<LcoHomePage> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    statBox(
-                      label: 'New',
-                      value: '$newCust',
-                      color: Colors.blueAccent,
-                      icon: Icons.fiber_new,
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LcoCustomersPage(
+                                lco: widget.lco,
+                                initialStatus: 'new',
+                                initialPeriod: _resolvePeriodForApi(),
+                              ),
+                            ),
+                          );
+                        },
+                        child: statBox(
+                          label: 'New',
+                          value: '$newCust',
+                          color: Colors.blueAccent,
+                          icon: Icons.fiber_new,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    statBox(
-                      label: 'Referred',
-                      value: '$referredCust',
-                      color: Colors.purple,
-                      icon: Icons.person_add_alt_1,
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LcoCustomersPage(
+                                lco: widget.lco,
+                                initialStatus: 'referred',
+                                initialPeriod: _resolvePeriodForApi(),
+                              ),
+                            ),
+                          );
+                        },
+                        child: statBox(
+                          label: 'Referred',
+                          value: '$referredCust',
+                          color: Colors.purple,
+                          icon: Icons.person_add_alt_1,
+                        ),
+                      ),
                     ),
                   ],
                 ),

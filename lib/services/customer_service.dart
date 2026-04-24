@@ -209,6 +209,8 @@ class CustomerService {
         String? network,
         String? lcoId,
         String? lcoRef,
+        String? linkedCustomerId,   // ✅ ADD
+        String? connectionLabel,    // ✅ ADD
         XFile? imageFile}) async {
     // client-side quick validations
     if (setupBoxNumber.trim().isEmpty) {
@@ -224,8 +226,12 @@ class CustomerService {
         'setupBoxNumber': setupBoxNumber.trim(),
         if (vcNumber != null && vcNumber.trim().isNotEmpty) 'vcNumber': vcNumber.trim(),
         if (network != null && network.trim().isNotEmpty) 'network': network.trim(),
-        'lcoId': lcoId.trim(),
+        'lcoId': lcoId!.trim(),
         if (lcoRef != null && lcoRef.trim().isNotEmpty) 'lcoRef': lcoRef.trim(),
+
+        // 🔥 ADD THESE
+        if (linkedCustomerId != null) 'linkedCustomerId': linkedCustomerId,
+        if (connectionLabel != null) 'connectionLabel': connectionLabel,
       };
       final res = await ApiConfig.post('/api/customers/$customerId/boxes', payload);
       return {'statusCode': res['statusCode'], 'data': res['body']};
@@ -249,6 +255,13 @@ class CustomerService {
     if (network != null && network.trim().isNotEmpty) request.fields['network'] = network.trim();
     request.fields['lcoId'] = lcoId.trim();
     if (lcoRef != null && lcoRef.trim().isNotEmpty) request.fields['lcoRef'] = lcoRef.trim();
+
+    // 🔥 CRITICAL ADD
+    if (linkedCustomerId != null)
+      request.fields['linkedCustomerId'] = linkedCustomerId;
+
+    if (connectionLabel != null)
+      request.fields['connectionLabel'] = connectionLabel;
 
     try {
       // Read bytes from XFile (works both on web and mobile)
@@ -323,5 +336,16 @@ class CustomerService {
     return {'statusCode': res['statusCode'], 'data': res['body']};
   }
 
+  static Future<Map<String, dynamic>> disconnectBox(String boxId) async {
+    final res = await ApiConfig.patch(
+      '/api/customers/boxes/$boxId/disconnect',
+      {},
+    );
+
+    return {
+      'statusCode': res['statusCode'],
+      'data': res['body'],
+    };
+  }
 
 }

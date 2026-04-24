@@ -4,6 +4,8 @@ import '../../core/app_theme.dart';
 import '../../lco/pages/lco_networks.dart';
 import '../../lco/widgets/lco_bottom_navigation.dart';
 import '../../lco/pages/lco_settings_page.dart';
+import '../pages/lco_bank_details.dart';
+import '../pages/lco_customers_page.dart';
 
 class LcoSideMenu extends StatelessWidget {
   final Map<String, dynamic> lco;
@@ -200,6 +202,35 @@ class LcoSideMenu extends StatelessWidget {
                     icon: Icons.chat_bubble_outline,
                     label: 'Chat',
                     onTap: () => _navigateBottom(context, 3),
+                  ),
+
+                  _buildTile(
+                    context,
+                    icon: Icons.people,
+                    label: 'Customers',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LcoCustomersPage(lco: lco),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _buildTile(
+                    context,
+                    icon: Icons.account_balance,
+                    label: 'Bank Details',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LcoBankDetailsPage(lco: lco),
+                        ),
+                      );
+                    },
                   ),
 
                   Divider(height: 24, thickness: 1, color: Colors.grey.shade200),

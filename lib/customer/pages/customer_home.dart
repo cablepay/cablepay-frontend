@@ -137,7 +137,16 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       if (!mounted) return;
       if (res['statusCode'] == 200) {
         await safeSetState(this, () {
-          boxes = (res['data'] is List) ? res['data'] as List<dynamic> : [];
+          final allBoxes = (res['data'] is List) ? res['data'] as List<dynamic> : [];
+
+// 🔥 IMPORTANT FILTER — ONLY SHOW OWNER'S ORIGINAL BOXES
+          boxes = allBoxes.where((b) {
+            final isOwner = b['customer'] == widget.customer['_id'];
+            final isLinkedToMe = b['linkedCustomer'] == widget.customer['_id'];
+            final isRemoved = b['wasLinked'] == true;
+
+            return (isOwner || isLinkedToMe) && !isRemoved;
+          }).toList();
         });
       } else {
         await safeSetState(this, () {
@@ -289,11 +298,16 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 
   Future<void> _confirmAndPay(Map<String, dynamic> box) async {
+    final boxId = (box['_id'] ?? box['id']);
+    final idStr = boxId.toString();
+
+    if (activating[idStr] == true) return;
+
     if (!_hasSession) return;
 
     // 1. Validate Identifiers
     final customerId = widget.customer['_id'] ?? widget.customer['id'];
-    final boxId = (box['_id'] ?? box['id']);
+    // final boxId = (box['_id'] ?? box['id']);
 
     if (customerId == null || boxId == null) {
       ScaffoldMessenger.of(
@@ -413,7 +427,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     // if (confirmed != true) return;
 
     if (!mounted) return;
-    final idStr = boxId.toString();
+    // final idStr = boxId.toString();
     setState(() => activating[idStr] = true);
 
     try {
@@ -921,6 +935,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         ? Colors.black
         : Colors.white;
 
+    final isLinked = box['linkedCustomer'] != null;
+    final borderColor = isLinked ? Colors.orange : Colors.transparent;
+
     // Safe runner
     void _safeRun(VoidCallback cb) => Future.microtask(cb);
 
@@ -929,6 +946,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       // margin: const EdgeInsets.only(
       //   bottom: 8,
       // ), // Increased spacing between cards
+      margin: const EdgeInsets.only(bottom: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -940,13 +958,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             padding: const EdgeInsets.all(20), // More breathing room inside
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [_cardBlueStart, _cardBlueEnd],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+                colors: isLinked
+                    ? [Color(0xFF4E6FAE), Color(0xFF1C3F73)]
+                    : [_cardBlueStart, _cardBlueEnd],
               ),
-              borderRadius: BorderRadius.circular(
-                16,
-              ), // Slightly softer corners
+              borderRadius: BorderRadius.circular(16),
+              border: isLinked ? Border.all(color: Colors.orange, width: 2) : null,
               boxShadow: [
                 BoxShadow(
                   color: _cardBlueStart.withOpacity(0.25),
@@ -1012,6 +1029,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       ),
                     ),
 
+
                     // Status Pill
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -1071,6 +1089,27 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
 
                 const SizedBox(height: 24),
+
+                if (isLinked) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.link, size: 14, color: Colors.orange.shade200),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Linked to ${box['linkedCustomerName'] ?? 'Customer'}',
+                          style: TextStyle(
+                            color: Colors.orange.shade200,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
 
                 // --- Footer Row: Provider Info + Cutoff Box ---
                 Row(
@@ -1226,159 +1265,162 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     const SizedBox(height: 4),
                   ],
 
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50, // Comfortable tap target
-                    child: (() {
-                      // Extract backend status
-                      // final rawStatus = (box['status'] ?? '').toString().toLowerCase();
-                      //
-                      // // Conditions
-                      // final isActive = rawStatus == 'active' || rawStatus == 'succeeded';
-                      // final isProcessingState =
-                      //     rawStatus == 'pending' ||
-                      //         rawStatus == 'processing' ||
-                      //         rawStatus == 'waiting';
-                      //
-                      // // ---- CASE 1: ACTIVE → Show "Paid" ----
-                      // if (isActive) {
-                      //   return Container(
-                      //     width: double.infinity,
-                      //     height: 50,
-                      //     decoration: BoxDecoration(
-                      //       color: Colors.green.withOpacity(0.08),
-                      //       borderRadius: BorderRadius.circular(12),
-                      //       border: Border.all(color: Colors.green.withOpacity(0.2)),
-                      //     ),
-                      //     child: const Center(
-                      //       child: Text(
-                      //         'Paid',
-                      //         style: TextStyle(
-                      //           color: Colors.green,
-                      //           fontSize: 16,
-                      //           fontWeight: FontWeight.w700,
-                      //         ),
-                      //       ),
-                      //     ),
-                      //   );
-                      // }
-                      //
-                      // // ---- CASE 2: PROCESSING → Show "Processing…" ----
-                      // if (isProcessingState) {
-                      //   return Container(
-                      //     width: double.infinity,
-                      //     height: 50,
-                      //     decoration: BoxDecoration(
-                      //       color: Colors.amber.withOpacity(0.15),
-                      //       borderRadius: BorderRadius.circular(12),
-                      //       border: Border.all(color: Colors.amber.withOpacity(0.3)),
-                      //     ),
-                      //     child: const Center(
-                      //       child: Text(
-                      //         'Paid…',
-                      //         style: TextStyle(
-                      //           color: Colors.orange,
-                      //           fontSize: 16,
-                      //           fontWeight: FontWeight.w700,
-                      //         ),
-                      //       ),
-                      //     ),
-                      //   );
-                      // }
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: (() {
+                        // Extract backend status
+                        // final rawStatus = (box['status'] ?? '').toString().toLowerCase();
+                        //
+                        // // Conditions
+                        // final isActive = rawStatus == 'active' || rawStatus == 'succeeded';
+                        // final isProcessingState =
+                        //     rawStatus == 'pending' ||
+                        //         rawStatus == 'processing' ||
+                        //         rawStatus == 'waiting';
+                        //
+                        // // ---- CASE 1: ACTIVE → Show "Paid" ----
+                        // if (isActive) {
+                        //   return Container(
+                        //     width: double.infinity,
+                        //     height: 50,
+                        //     decoration: BoxDecoration(
+                        //       color: Colors.green.withOpacity(0.08),
+                        //       borderRadius: BorderRadius.circular(12),
+                        //       border: Border.all(color: Colors.green.withOpacity(0.2)),
+                        //     ),
+                        //     child: const Center(
+                        //       child: Text(
+                        //         'Paid',
+                        //         style: TextStyle(
+                        //           color: Colors.green,
+                        //           fontSize: 16,
+                        //           fontWeight: FontWeight.w700,
+                        //         ),
+                        //       ),
+                        //     ),
+                        //   );
+                        // }
+                        //
+                        // // ---- CASE 2: PROCESSING → Show "Processing…" ----
+                        // if (isProcessingState) {
+                        //   return Container(
+                        //     width: double.infinity,
+                        //     height: 50,
+                        //     decoration: BoxDecoration(
+                        //       color: Colors.amber.withOpacity(0.15),
+                        //       borderRadius: BorderRadius.circular(12),
+                        //       border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                        //     ),
+                        //     child: const Center(
+                        //       child: Text(
+                        //         'Paid…',
+                        //         style: TextStyle(
+                        //           color: Colors.orange,
+                        //           fontSize: 16,
+                        //           fontWeight: FontWeight.w700,
+                        //         ),
+                        //       ),
+                        //     ),
+                        //   );
+                        // }
 
-                      final rawStatus = (box['status'] ?? '')
-                          .toString()
-                          .toLowerCase();
+                        final rawStatus = (box['status'] ?? '')
+                            .toString()
+                            .toLowerCase();
 
-                      final isProcessingState =
-                          rawStatus == 'pending' ||
-                          rawStatus == 'processing' ||
-                          rawStatus == 'waiting';
+                        final isProcessingState =
+                            rawStatus == 'pending' ||
+                            rawStatus == 'processing' ||
+                            rawStatus == 'waiting';
 
-                      final isPaidThisMonth = _isPaidForCurrentMonth(box);
+                        final isPaidThisMonth = _isPaidForCurrentMonth(box);
 
-                      // ---- CASE 1: PAID FOR CURRENT MONTH ----
-                      if (isPaidThisMonth) {
-                        return Container(
-                          width: double.infinity,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.green.withOpacity(0.2),
-                            ),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'Paid',
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                        // ---- CASE 1: PAID FOR CURRENT MONTH ----
+                        if (isPaidThisMonth) {
+                          return Container(
+                            width: double.infinity,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.green.withOpacity(0.2),
                               ),
                             ),
-                          ),
-                        );
-                      }
-
-                      // ---- CASE 2: PAYMENT DONE BUT BACKEND STILL PROCESSING ----
-                      if (isProcessingState) {
-                        return Container(
-                          width: double.infinity,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.amber.withOpacity(0.3),
-                            ),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'Paid…',
-                              style: TextStyle(
-                                color: Colors.orange,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      // ---- CASE 3: NOT PAID FOR CURRENT MONTH → PAY NOW ----
-                      return ElevatedButton(
-                        onPressed: isProcessing
-                            ? null
-                            : () => _safeRun(() => _confirmAndPay(box)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _buttonBlue,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: isProcessing
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                            : Text(
-                                // 'Pay Now • ${_formatWallet(origPaise)}',
-                                'Pay Now • ${_formatWallet(netToPay)}',
-                                style: const TextStyle(
+                            child: const Center(
+                              child: Text(
+                                'Paid',
+                                style: TextStyle(
+                                  color: Colors.green,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                      );
-                    })(),
+                            ),
+                          );
+                        }
+
+                        // ---- CASE 2: PAYMENT DONE BUT BACKEND STILL PROCESSING ----
+                        if (isProcessingState) {
+                          return Container(
+                            width: double.infinity,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.amber.withOpacity(0.3),
+                              ),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'Paid…',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        // ---- CASE 3: NOT PAID FOR CURRENT MONTH → PAY NOW ----
+                        return ElevatedButton(
+                          onPressed: isProcessing
+                              ? null
+                              : () => _safeRun(() => _confirmAndPay(box)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _buttonBlue,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: isProcessing
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : Text(
+                                  // 'Pay Now • ${_formatWallet(origPaise)}',
+                                  'Pay Now • ${_formatWallet(netToPay)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                        );
+                      })(),
+                    ),
                   ),
                 ],
               );
@@ -1773,6 +1815,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final mq = MediaQuery.of(context);
     final isLarge = mq.size.width >= 720;
     final contentMaxWidth = isLarge ? 500.0 : double.infinity;
+    final ownBoxes = boxes.where((b) => b['linkedCustomer'] == null).toList();
+    final linkedBoxes = boxes.where((b) => b['linkedCustomer'] != null).toList();
 
     return Scaffold(
       backgroundColor: AppTheme.grey1,
@@ -1874,84 +1918,121 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           //     ? const Center(child: CircularProgressIndicator())
           child: Stack(
             children: [
-               RefreshIndicator(
-                  onRefresh: _loadBoxes,
-                  color: _buttonBlue,
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Single-line greeting: "Hello, Name"
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Hello, ${_customerNameSafe()}',
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
-                                    ),
+              RefreshIndicator(
+                onRefresh: _loadBoxes,
+                color: _buttonBlue,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Single-line greeting: "Hello, Name"
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Hello, ${_customerNameSafe()}',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
                                   ),
-                                  _buildExpiryHint(),
-                                ],
-                              ),
+                                ),
+                                _buildExpiryHint(),
+                              ],
+                            ),
 
-                              const SizedBox(height: 3),
-                            ],
-                          ),
+                            const SizedBox(height: 3),
+                          ],
                         ),
                       ),
+                    ),
 
-                      // Content area: empty state or list of boxes
-                      if (loading) ...[
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(child: CircularProgressIndicator()),
+                    // Content area: empty state or list of boxes
+                    if (loading) ...[
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    ] else if (boxes.isEmpty) ...[
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _buildEmpty(
+                          'No Plans Found',
+                          'Link a Set-Top Box to view your plan details.',
                         ),
-                      ] else if (boxes.isEmpty) ...[
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: _buildEmpty(
-                            'No Plans Found',
-                            'Link a Set-Top Box to view your plan details.',
+                      ),
+                    ] else ...[
+                      // 🔹 OWN BOXES (TOP)
+                      if (ownBoxes.isNotEmpty) ...[
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                            child: Text(
+                              'Your Connection (${ownBoxes.length})',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
                           ),
                         ),
-                      ] else ...[
+
                         SliverPadding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate((context, i) {
-                              final raw = boxes[i];
-                              final box = (raw is Map<String, dynamic>)
-                                  ? raw
-                                  : Map<String, dynamic>.from(raw as Map);
+                              final box = Map<String, dynamic>.from(ownBoxes[i]);
                               return _buildBoxCard(box, i, contentMaxWidth);
-                            }, childCount: boxes.length),
+                            }, childCount: ownBoxes.length),
+                          ),
+                        ),
+                      ],
+
+// 🔹 LINKED BOXES (BOTTOM)
+                      if (linkedBoxes.isNotEmpty) ...[
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                            child: Text(
+                              'Linked Connections (${linkedBoxes.length})',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.orange.shade700,
+                              ),
+                            ),
                           ),
                         ),
 
-                        SliverToBoxAdapter(
-                          child: _buildReferralCard(contentMaxWidth),
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate((context, i) {
+                              final box = Map<String, dynamic>.from(linkedBoxes[i]);
+                              return _buildBoxCard(box, i, contentMaxWidth);
+                            }, childCount: linkedBoxes.length),
+                          ),
                         ),
                       ],
-                      // bottom padding so list has breathing room
-                      SliverToBoxAdapter(child: const SizedBox(height: 20)),
+
+                      SliverToBoxAdapter(
+                        child: _buildReferralCard(contentMaxWidth),
+                      ),
                     ],
-                  ),
+                    // bottom padding so list has breathing room
+                    SliverToBoxAdapter(child: const SizedBox(height: 20)),
+                  ],
                 ),
-          _buildOfflineOverlay(),
+              ),
+              _buildOfflineOverlay(),
             ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -1972,10 +2053,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               SizedBox(height: 12),
               Text(
                 'No internet connection',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ],
           ),
